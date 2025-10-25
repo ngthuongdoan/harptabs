@@ -13,13 +13,14 @@ import { Button } from './ui/button';
 import { CornerDownLeft, Trash2 } from 'lucide-react';
 
 type Mode = "noteToTab" | "tabToNote";
+type HistoryItem = { hole: string; note: string };
 
 export default function HarpNavigator() {
   const [key, setKey] = useState<HarmonicaKey>('C');
   const [mode, setMode] = useState<Mode>("noteToTab");
   const [selectedNote, setSelectedNote] = useState<Note | null>(null);
   const [selectedHoleInfo, setSelectedHoleInfo] = useState<{ hole: number; action: HoleAction } | null>(null);
-  const [history, setHistory] = useState<string[][]>([[]]);
+  const [history, setHistory] = useState<HistoryItem[][]>([[]]);
 
   const layout = useMemo(() => getHarmonicaLayout(key), [key]);
   const noteOptions = useMemo(() => generateNoteOptions(), []);
@@ -37,7 +38,8 @@ export default function HarpNavigator() {
     const tab = findTabFromNote(layout, note);
     setSelectedHoleInfo(tab);
     if (tab) {
-        addToHistory(`${tab.hole > 0 ? '+' : ''}${tab.hole}`);
+        const displayString = `${tab.hole} ${tab.action}`;
+        addToHistory({hole: displayString, note});
     }
   };
 
@@ -46,20 +48,13 @@ export default function HarpNavigator() {
     const note = layout[hole]?.note;
     setSelectedNote(note || null);
     
-    let tabString = '';
-    if (action === 'blow') {
-        tabString = `${hole}`;
-    } else {
-        // For draw notes, it's common to use negative numbers or just the number. 
-        // Let's just use the number for simplicity and denote draw with parenthesis in display if needed.
-        // Or we can just show the action. The user said "separate by spaces", so let's make it simple.
-        tabString = `${hole}${action === 'draw' ? 'D' : ''}`;
+    if (note) {
+        const displayString = `${hole} ${action}`;
+        addToHistory({hole: displayString, note});
     }
-    const displayString = `${hole} ${action}`;
-    addToHistory(displayString);
   };
   
-  const addToHistory = (item: string) => {
+  const addToHistory = (item: HistoryItem) => {
       setHistory(prev => {
           const newHistory = [...prev];
           const lastLine = newHistory[newHistory.length - 1];
@@ -69,7 +64,13 @@ export default function HarpNavigator() {
   };
 
   const handleNewLine = () => {
-      setHistory(prev => [...prev, []]);
+      setHistory(prev => {
+          const lastLine = prev[prev.length - 1];
+          if(lastLine.length > 0) {
+            return [...prev, []];
+          }
+          return prev;
+      });
   };
 
   const handleClearHistory = () => {
@@ -150,7 +151,7 @@ export default function HarpNavigator() {
              {mode === 'noteToTab' ? (
                 <div className="w-full flex flex-col gap-2">
                   <Label htmlFor="note-select">Select a Musical Note</Label>
-                  <Select onValueChange={handleNoteSelect} value={selectedNote ?? undefined}>
+                  <Select onValueChange={(v) => handleNoteSelect(v as Note)} value={selectedNote ?? undefined}>
                     <SelectTrigger id="note-select" className="w-full">
                       <SelectValue placeholder="Choose a note..." />
                     </SelectTrigger>
@@ -191,16 +192,31 @@ export default function HarpNavigator() {
                   </CardHeader>
                   <CardContent>
                       <div className="p-4 bg-background/50 rounded-lg min-h-[60px] text-lg font-mono">
-                          {history.map((line, lineIndex) => (
-                              <div key={lineIndex} className="flex flex-wrap items-center">
-                                  {line.map((item, itemIndex) => (
-                                      <span key={itemIndex} className="mr-4">{item}</span>
-                                  ))}
-                              </div>
-                          ))}
                           {(history.length === 1 && history[0].length === 0) && (
                               <p className="text-muted-foreground text-sm">Your clicked tabs will appear here.</p>
                           )}
+                          <div className="grid grid-cols-2 gap-8">
+                            <div>
+                                <h3 className="font-semibold text-sm uppercase text-muted-foreground tracking-wider mb-2">Hole / Action</h3>
+                                {history.map((line, lineIndex) => (
+                                    <div key={`hole-line-${lineIndex}`} className="flex flex-wrap items-center min-h-[28px]">
+                                        {line.map((item, itemIndex) => (
+                                            <span key={`hole-item-${itemIndex}`} className="mr-4">{item.hole}</span>
+                                        ))}
+                                    </div>
+                                ))}
+                            </div>
+                            <div>
+                                <h3 className="font-semibold text-sm uppercase text-muted-foreground tracking-wider mb-2">Note</h3>
+                                {history.map((line, lineIndex) => (
+                                    <div key={`note-line-${lineIndex}`} className="flex flex-wrap items-center min-h-[28px]">
+                                        {line.map((item, itemIndex) => (
+                                            <span key={`note-item-${itemIndex}`} className="mr-4">{item.note}</span>
+                                        ))}
+                                    </div>
+                                ))}
+                            </div>
+                          </div>
                       </div>
                   </CardContent>
               </Card>
