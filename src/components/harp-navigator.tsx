@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -45,11 +45,10 @@ export default function HarpNavigator() {
 
   const handleHoleSelect = (hole: number, action: HoleAction) => {
     const note = layout[hole]?.note;
-    // Only update if the hole selection is the primary action (in tabToNote mode)
     if (mode === 'tabToNote') {
       setSelectedHoleInfo({ hole, action });
       setSelectedNote(note || null);
-      if (note) {
+       if (note && (!selectedHoleInfo || selectedHoleInfo.hole !== hole)) {
           const displayString = `${hole}`;
           addToHistory({hole: displayString, note});
       }
