@@ -1,11 +1,14 @@
+
 export type Note = string;
 export type HarmonicaKey = 'G' | 'Ab' | 'A' | 'Bb' | 'B' | 'C' | 'Db' | 'D' | 'Eb' | 'E' | 'F' | 'F#';
 export type HoleAction = 'blow' | 'draw';
-export type Hole = {
-  [action in HoleAction]: Note;
-};
+
+// This layout supports one action per hole.
 export type HarmonicaLayout = {
-  [hole: number]: Hole;
+  [hole: number]: {
+    action: HoleAction;
+    note: Note;
+  };
 };
 
 export const HARMONICA_KEYS: HarmonicaKey[] = ['G', 'Ab', 'A', 'Bb', 'B', 'C', 'Db', 'D', 'Eb', 'E', 'F', 'F#'];
@@ -18,17 +21,29 @@ ALL_NOTES.forEach((note, index) => NOTE_TO_INDEX[note] = index);
 ALL_NOTES_FLAT.forEach((note, index) => NOTE_TO_INDEX[note] = index);
 
 const C_HARMONICA_LAYOUT: HarmonicaLayout = {
-  1: { blow: 'C4', draw: 'D4' },
-  2: { blow: 'E4', draw: 'G4' },
-  3: { blow: 'G4', draw: 'B4' },
-  4: { blow: 'C5', draw: 'D5' },
-  5: { blow: 'E5', draw: 'F5' },
-  6: { blow: 'G5', draw: 'A5' },
-  7: { blow: 'C6', draw: 'B5' },
-  8: { blow: 'E6', draw: 'D6' },
-  9: { blow: 'G6', draw: 'F6' },
-  10: { blow: 'C7', draw: 'A6' },
+    1: { action: 'blow', note: 'C4' },
+    2: { action: 'draw', note: 'D4' },
+    3: { action: 'blow', note: 'E4' },
+    4: { action: 'draw', note: 'F4' },
+    5: { action: 'blow', note: 'G4' },
+    6: { action: 'draw', note: 'A4' },
+    7: { action: 'blow', note: 'B4' },
+    8: { action: 'draw', note: 'C5' },
+    9: { action: 'blow', note: 'D5' },
+    10: { action: 'draw', note: 'E5' },
+    11: { action: 'blow', note: 'F5' },
+    12: { action: 'draw', note: 'G5' },
+    13: { action: 'blow', note: 'A5' },
+    14: { action: 'draw', note: 'B5' },
+    15: { action: 'blow', note: 'C6' },
+    16: { action: 'draw', note: 'D6' },
+    17: { action: 'blow', note: 'E6' },
+    18: { action: 'draw', note: 'F6' },
+    19: { action: 'blow', note: 'G6' },
+    20: { action: 'draw', note: 'A6' },
+    21: { action: 'blow', note: 'B6' },
 };
+
 
 function parseNote(note: Note): { name: string, octave: number } {
   const name = note.replace(/[0-9]/g, '');
@@ -61,8 +76,8 @@ export function getHarmonicaLayout(key: HarmonicaKey): HarmonicaLayout {
   const newLayout: HarmonicaLayout = {};
   for (const hole in C_HARMONICA_LAYOUT) {
     newLayout[hole] = {
-      blow: transposeNote(C_HARMONICA_LAYOUT[hole].blow, semitones),
-      draw: transposeNote(C_HARMONICA_LAYOUT[hole].draw, semitones),
+      action: C_HARMONICA_LAYOUT[hole].action,
+      note: transposeNote(C_HARMONICA_LAYOUT[hole].note, semitones),
     };
   }
 
@@ -71,13 +86,10 @@ export function getHarmonicaLayout(key: HarmonicaKey): HarmonicaLayout {
 
 export function findTabFromNote(layout: HarmonicaLayout, note: Note): { hole: number, action: HoleAction } | null {
   for (const hole in layout) {
-    const holeActions = layout[hole];
+    const holeInfo = layout[hole];
     
-    if (holeActions.blow === note) {
-      return { hole: parseInt(hole), action: 'blow' };
-    }
-    if (holeActions.draw === note) {
-      return { hole: parseInt(hole), action: 'draw' };
+    if (holeInfo.note === note) {
+      return { hole: parseInt(hole), action: holeInfo.action };
     }
   }
 
