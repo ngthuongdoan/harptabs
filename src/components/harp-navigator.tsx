@@ -44,13 +44,15 @@ export default function HarpNavigator() {
   };
 
   const handleHoleSelect = (hole: number, action: HoleAction) => {
-    setSelectedHoleInfo({ hole, action });
     const note = layout[hole]?.note;
-    setSelectedNote(note || null);
-    
-    if (note) {
-        const displayString = `${hole}`;
-        addToHistory({hole: displayString, note});
+    // Only update if the hole selection is the primary action (in tabToNote mode)
+    if (mode === 'tabToNote') {
+      setSelectedHoleInfo({ hole, action });
+      setSelectedNote(note || null);
+      if (note) {
+          const displayString = `${hole}`;
+          addToHistory({hole: displayString, note});
+      }
     }
   };
   
