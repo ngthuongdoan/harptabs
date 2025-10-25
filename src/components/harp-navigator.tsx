@@ -38,7 +38,7 @@ export default function HarpNavigator() {
     const tab = findTabFromNote(layout, note);
     setSelectedHoleInfo(tab);
     if (tab) {
-        const displayString = `${tab.hole} ${tab.action}`;
+        const displayString = `${tab.hole}`;
         addToHistory({hole: displayString, note});
     }
   };
@@ -49,7 +49,7 @@ export default function HarpNavigator() {
     setSelectedNote(note || null);
     
     if (note) {
-        const displayString = `${hole} ${action}`;
+        const displayString = `${hole}`;
         addToHistory({hole: displayString, note});
     }
   };
@@ -197,7 +197,7 @@ export default function HarpNavigator() {
                           )}
                           <div className="grid grid-cols-2 gap-8">
                             <div>
-                                <h3 className="font-semibold text-sm uppercase text-muted-foreground tracking-wider mb-2">Hole / Action</h3>
+                                <h3 className="font-semibold text-sm uppercase text-muted-foreground tracking-wider mb-2">Hole</h3>
                                 {history.map((line, lineIndex) => (
                                     <div key={`hole-line-${lineIndex}`} className="flex flex-wrap items-center min-h-[28px]">
                                         {line.map((item, itemIndex) => (
