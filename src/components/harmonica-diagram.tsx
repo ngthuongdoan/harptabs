@@ -15,7 +15,7 @@ export default function HarmonicaDiagram({ layout, selectedHoleInfo, onHoleSelec
 
 
   return (
-    <div className="flex flex-col rounded-lg border-2 border-primary/50 bg-gradient-to-b from-card to-background shadow-inner p-2 gap-1">
+    <div className="flex flex-col rounded-lg border-2 border-primary/50 bg-gradient-to-b from-card to-background shadow-inner p-2 gap-1 overflow-x-auto">
       <div className="flex justify-around w-full">
         {holes.map((holeNumber) => (
           <div key={`hole-num-${holeNumber}`} className={cn("text-center font-bold text-sm text-foreground/80 font-headline", holeWidth)}>

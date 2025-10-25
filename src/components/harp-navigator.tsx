@@ -72,7 +72,7 @@ export default function HarpNavigator() {
   };
   
   return (
-    <Card className="w-full max-w-4xl shadow-2xl">
+    <Card className="w-full max-w-7xl shadow-2xl">
       <CardHeader className="text-center">
         <CardTitle className="text-3xl font-headline">HarpTab Navigator</CardTitle>
         <CardDescription>Your interactive guide to the diatonic harmonica.</CardDescription>
