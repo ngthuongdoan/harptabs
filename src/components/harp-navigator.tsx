@@ -1,54 +1,121 @@
 
 "use client";
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import HarmonicaDiagram from './harmonica-diagram';
 import { getHarmonicaLayout, type Note, type HoleAction } from '@/lib/harmonica';
 import { Separator } from './ui/separator';
 import { Button } from './ui/button';
-import { CornerDownLeft, Trash2 } from 'lucide-react';
-
-type HistoryItem = { hole: string; note: string };
+import { CornerDownLeft, Trash2, Delete, Save, FolderOpen } from 'lucide-react';
+import SaveTabDialog from './save-tab-dialog';
+import SavedTabsManagerDialog from './saved-tabs-manager';
 
 export default function HarpNavigator() {
   const [selectedNote, setSelectedNote] = useState<Note | null>(null);
   const [selectedHoleInfo, setSelectedHoleInfo] = useState<{ hole: number; action: HoleAction } | null>(null);
-  const [history, setHistory] = useState<HistoryItem[][]>([[]]);
+  const [holeHistory, setHoleHistory] = useState<string>('');
+  const [noteHistory, setNoteHistory] = useState<string>('');
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+  const [savedTabsDialogOpen, setSavedTabsDialogOpen] = useState(false);
 
-  const layout = useMemo(() => getHarmonicaLayout('C'), []);
+  const layout = useMemo(() => getHarmonicaLayout(), []);
+  const processingRef = useRef(false);
 
-  const handleHoleSelect = (hole: number, action: HoleAction) => {
+  const addToHistory = useCallback((hole: string, note: string) => {
+    setHoleHistory(prev => {
+      if (!prev) return hole;
+      if (prev.endsWith('\n')) return prev + hole;
+      return prev + ' ' + hole;
+    });
+    setNoteHistory(prev => {
+      if (!prev) return note;
+      if (prev.endsWith('\n')) return prev + note;
+      return prev + ' ' + note;
+    });
+  }, []);
+
+  const handleNewLine = () => {
+    if (holeHistory || noteHistory) {
+      setHoleHistory(prev => prev + '\n');
+      setNoteHistory(prev => prev + '\n');
+    }
+  };
+
+  const handleBackspace = () => {
+    setHoleHistory(prev => {
+      if (!prev) return prev;
+
+      // If the string ends with a newline, remove it
+      if (prev.endsWith('\n')) {
+        return prev.slice(0, -1);
+      }
+
+      // Find the last space or start of string to remove the last entry
+      const lastSpaceIndex = prev.lastIndexOf(' ');
+      if (lastSpaceIndex === -1) {
+        // No spaces found, clear the string
+        return '';
+      } else {
+        // Remove everything after the last space
+        return prev.slice(0, lastSpaceIndex);
+      }
+    });
+
+    setNoteHistory(prev => {
+      if (!prev) return prev;
+
+      // If the string ends with a newline, remove it
+      if (prev.endsWith('\n')) {
+        return prev.slice(0, -1);
+      }
+
+      // Find the last space or start of string to remove the last entry
+      const lastSpaceIndex = prev.lastIndexOf(' ');
+      if (lastSpaceIndex === -1) {
+        // No spaces found, clear the string
+        return '';
+      } else {
+        // Remove everything after the last space
+        return prev.slice(0, lastSpaceIndex);
+      }
+    });
+  };
+
+  const handleHoleSelect = useCallback((hole: number, action: HoleAction) => {
+    console.log('handleHoleSelect called:', hole, action);
+
+    // Prevent multiple rapid calls
+    if (processingRef.current) {
+      console.log('Call blocked - processing');
+      return;
+    }
+
+    processingRef.current = true;
+
     const note = layout[hole]?.note;
     setSelectedHoleInfo({ hole, action });
     setSelectedNote(note || null);
     if (note) {
-      const displayString = `${hole}`;
-      addToHistory({hole: displayString, note});
+      addToHistory(hole.toString(), note);
     }
-  };
-  
-  const addToHistory = (item: HistoryItem) => {
-      setHistory(prev => {
-          const newHistory = [...prev];
-          const lastLine = newHistory[newHistory.length - 1];
-          lastLine.push(item);
-          return newHistory;
-      });
-  };
 
-  const handleNewLine = () => {
-      setHistory(prev => {
-          const lastLine = prev[prev.length - 1];
-          if(lastLine.length > 0) {
-            return [...prev, []];
-          }
-          return prev;
-      });
-  };
+    // Reset the flag after a short delay
+    setTimeout(() => {
+      processingRef.current = false;
+    }, 50);
+  }, [addToHistory]);
+
+
 
   const handleClearHistory = () => {
-      setHistory([[]]);
+    setHoleHistory('');
+    setNoteHistory('');
+  };
+
+  const handleLoadTab = (holeHistory: string, noteHistory: string) => {
+    setHoleHistory(holeHistory);
+    setNoteHistory(noteHistory);
   };
 
   const ResultDisplay = () => {
@@ -91,42 +158,49 @@ export default function HarpNavigator() {
                   <CardHeader className="flex flex-row items-center justify-between pb-2">
                       <CardTitle className="text-lg font-medium">Tab History</CardTitle>
                       <div className="flex gap-2">
-                          <Button variant="outline" size="sm" onClick={handleNewLine}>
+                <Button variant="outline" size="sm" onClick={() => setSavedTabsDialogOpen(true)}>
+                  <FolderOpen className="h-4 w-4 mr-2" />
+                  Saved Tabs
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => setSaveDialogOpen(true)} disabled={!holeHistory && !noteHistory}>
+                  <Save className="h-4 w-4 mr-2" />
+                  Save
+                </Button>
+                <Button variant="outline" size="sm" onClick={handleNewLine} disabled={!holeHistory && !noteHistory}>
                               <CornerDownLeft className="h-4 w-4 mr-2" />
                               New Line
                           </Button>
-                          <Button variant="destructive" size="sm" onClick={handleClearHistory} disabled={history.length === 1 && history[0].length === 0}>
+                <Button variant="outline" size="sm" onClick={handleBackspace} disabled={!holeHistory && !noteHistory}>
+                  <Delete className="h-4 w-4 mr-2" />
+                  Backspace
+                </Button>
+                <Button variant="destructive" size="sm" onClick={handleClearHistory} disabled={!holeHistory && !noteHistory}>
                               <Trash2 className="h-4 w-4 mr-2" />
                               Clear
                           </Button>
                       </div>
                   </CardHeader>
                   <CardContent>
-                      <div className="p-4 bg-background/50 rounded-lg min-h-[60px] text-lg font-mono">
-                          {(history.length === 1 && history[0].length === 0) && (
-                              <p className="text-muted-foreground text-sm">Your clicked tabs will appear here.</p>
-                          )}
-                          <div className="grid grid-cols-2 gap-8">
-                            <div>
-                                <h3 className="font-semibold text-sm uppercase text-muted-foreground tracking-wider mb-2">Hole</h3>
-                                {history.map((line, lineIndex) => (
-                                    <div key={`hole-line-${lineIndex}`} className="flex flex-wrap items-center min-h-[28px]">
-                                        {line.map((item, itemIndex) => (
-                                            <span key={`hole-item-${itemIndex}`} className="mr-4">{item.hole}</span>
-                                        ))}
-                                    </div>
-                                ))}
-                            </div>
-                            <div>
-                                <h3 className="font-semibold text-sm uppercase text-muted-foreground tracking-wider mb-2">Note</h3>
-                                {history.map((line, lineIndex) => (
-                                    <div key={`note-line-${lineIndex}`} className="flex flex-wrap items-center min-h-[28px]">
-                                        {line.map((item, itemIndex) => (
-                                            <span key={`note-item-${itemIndex}`} className="mr-4">{item.note}</span>
-                                        ))}
-                                    </div>
-                                ))}
-                            </div>
+              <div className="grid grid-cols-2 gap-6">
+                <div>
+                  <h3 className="font-semibold text-sm uppercase text-muted-foreground tracking-wider mb-2">Hole Numbers</h3>
+                  <div className="p-4 bg-background/50 rounded-lg min-h-[60px] max-h-[200px] text-lg font-mono overflow-y-auto">
+                    {!holeHistory ? (
+                      <p className="text-muted-foreground text-sm">Hole numbers will appear here.</p>
+                    ) : (
+                      <pre className="break-words whitespace-pre-wrap">{holeHistory}</pre>
+                    )}
+                  </div>
+                </div>
+                <div>
+                  <h3 className="font-semibold text-sm uppercase text-muted-foreground tracking-wider mb-2">Note Letters</h3>
+                  <div className="p-4 bg-background/50 rounded-lg min-h-[60px] max-h-[200px] text-lg font-mono overflow-y-auto">
+                    {!noteHistory ? (
+                      <p className="text-muted-foreground text-sm">Note letters will appear here.</p>
+                    ) : (
+                      <pre className="break-words whitespace-pre-wrap">{noteHistory}</pre>
+                    )}
+                  </div>
                           </div>
                       </div>
                   </CardContent>
@@ -134,11 +208,39 @@ export default function HarpNavigator() {
           </div>
           
           <Separator />
-          
-          <div className="min-h-[80px] flex items-center justify-center p-4 bg-background/50 rounded-lg">
-            <ResultDisplay />
+
+        <div className="flex flex-col gap-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg font-medium">Note Reading Guide</CardTitle>
+              <CardDescription>Reference guide for reading musical notes on the staff</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex justify-center">
+                <img
+                  src="https://b3296444.smushcdn.com/3296444/wp-content/uploads/Complete-Edition-Note-Reading-Music-Workbook-Notes-Covered.png?lossy=1&strip=1&webp=0"
+                  alt="Musical note reading guide showing treble clef notes on staff lines and spaces"
+                  className="max-w-full h-auto rounded-lg border border-border/50"
+                  loading="lazy"
+                />
+              </div>
+            </CardContent>
+          </Card>
           </div>
       </CardContent>
+
+      <SaveTabDialog
+        open={saveDialogOpen}
+        onOpenChange={setSaveDialogOpen}
+        holeHistory={holeHistory}
+        noteHistory={noteHistory}
+      />
+
+      <SavedTabsManagerDialog
+        open={savedTabsDialogOpen}
+        onOpenChange={setSavedTabsDialogOpen}
+        onLoadTab={handleLoadTab}
+      />
     </Card>
   );
 }
