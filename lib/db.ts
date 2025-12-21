@@ -7,6 +7,7 @@ export interface SavedTab {
   title: string;
   holeHistory: string;
   noteHistory: string;
+  status: 'pending' | 'approved';
   createdAt: Date;
   updatedAt: Date;
 }
@@ -21,9 +22,24 @@ export async function initializeDatabase() {
         title VARCHAR(500) NOT NULL,
         hole_history TEXT DEFAULT '',
         note_history TEXT DEFAULT '',
+        status VARCHAR(20) DEFAULT 'pending',
         created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
       )
+    `;
+    
+    // Add status column if it doesn't exist (for existing tables)
+    await sql`
+      ALTER TABLE harmonica_tabs 
+      ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'approved'
+    `;
+    
+    // Approve all existing tabs (one-time migration)
+    // This ensures tabs created before the review system are visible
+    await sql`
+      UPDATE harmonica_tabs 
+      SET status = 'approved' 
+      WHERE status IS NULL OR status = ''
     `;
     
     console.log('Database initialized successfully');
@@ -35,14 +51,22 @@ export async function initializeDatabase() {
 
 // Database operations
 export class TabsDB {
-  static async getAllTabs(): Promise<SavedTab[]> {
+  static async getAllTabs(includeAll: boolean = false): Promise<SavedTab[]> {
     try {
-      const data = await sql`
-        SELECT id, title, hole_history as "holeHistory", note_history as "noteHistory", 
-               created_at as "createdAt", updated_at as "updatedAt"
-        FROM harmonica_tabs 
-        ORDER BY updated_at DESC
-      `;
+      const data = includeAll
+        ? await sql`
+            SELECT id, title, hole_history as "holeHistory", note_history as "noteHistory", 
+                   status, created_at as "createdAt", updated_at as "updatedAt"
+            FROM harmonica_tabs 
+            ORDER BY updated_at DESC
+          `
+        : await sql`
+            SELECT id, title, hole_history as "holeHistory", note_history as "noteHistory", 
+                   status, created_at as "createdAt", updated_at as "updatedAt"
+            FROM harmonica_tabs 
+            WHERE status = 'approved'
+            ORDER BY updated_at DESC
+          `;
       return data as SavedTab[];
     } catch (error) {
       console.error('Error fetching tabs:', error);
@@ -50,14 +74,21 @@ export class TabsDB {
     }
   }
 
-  static async getTab(id: string): Promise<SavedTab | null> {
+  static async getTab(id: string, includeAll: boolean = false): Promise<SavedTab | null> {
     try {
-      const data = await sql`
-        SELECT id, title, hole_history as "holeHistory", note_history as "noteHistory", 
-               created_at as "createdAt", updated_at as "updatedAt"
-        FROM harmonica_tabs 
-        WHERE id = ${id}
-      `;
+      const data = includeAll
+        ? await sql`
+            SELECT id, title, hole_history as "holeHistory", note_history as "noteHistory", 
+                   status, created_at as "createdAt", updated_at as "updatedAt"
+            FROM harmonica_tabs 
+            WHERE id = ${id}
+          `
+        : await sql`
+            SELECT id, title, hole_history as "holeHistory", note_history as "noteHistory", 
+                   status, created_at as "createdAt", updated_at as "updatedAt"
+            FROM harmonica_tabs 
+            WHERE id = ${id} AND status = 'approved'
+          `;
       return data[0] as SavedTab || null;
     } catch (error) {
       console.error('Error fetching tab:', error);
@@ -71,10 +102,10 @@ export class TabsDB {
       const id = `tab-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
       
       const data = await sql`
-        INSERT INTO harmonica_tabs (id, title, hole_history, note_history, created_at, updated_at)
-        VALUES (${id}, ${title}, ${holeHistory}, ${noteHistory}, ${now.toISOString()}, ${now.toISOString()})
+        INSERT INTO harmonica_tabs (id, title, hole_history, note_history, status, created_at, updated_at)
+        VALUES (${id}, ${title}, ${holeHistory}, ${noteHistory}, 'pending', ${now.toISOString()}, ${now.toISOString()})
         RETURNING id, title, hole_history as "holeHistory", note_history as "noteHistory", 
-                  created_at as "createdAt", updated_at as "updatedAt"
+                  status, created_at as "createdAt", updated_at as "updatedAt"
       `;
       return data[0] as SavedTab;
     } catch (error) {
@@ -92,7 +123,7 @@ export class TabsDB {
         SET title = ${title}, hole_history = ${holeHistory}, note_history = ${noteHistory}, updated_at = ${now.toISOString()}
         WHERE id = ${id}
         RETURNING id, title, hole_history as "holeHistory", note_history as "noteHistory", 
-                  created_at as "createdAt", updated_at as "updatedAt"
+                  status, created_at as "createdAt", updated_at as "updatedAt"
       `;
       return data[0] as SavedTab || null;
     } catch (error) {
@@ -100,7 +131,39 @@ export class TabsDB {
       throw error;
     }
   }
+  static async approveTab(id: string): Promise<SavedTab | null> {
+    try {
+      const now = new Date();
+      
+      const data = await sql`
+        UPDATE harmonica_tabs 
+        SET status = 'approved', updated_at = ${now.toISOString()}
+        WHERE id = ${id}
+        RETURNING id, title, hole_history as "holeHistory", note_history as "noteHistory", 
+                  status, created_at as "createdAt", updated_at as "updatedAt"
+      `;
+      return data[0] as SavedTab || null;
+    } catch (error) {
+      console.error('Error approving tab:', error);
+      throw error;
+    }
+  }
 
+  static async getPendingTabs(): Promise<SavedTab[]> {
+    try {
+      const data = await sql`
+        SELECT id, title, hole_history as "holeHistory", note_history as "noteHistory", 
+               status, created_at as "createdAt", updated_at as "updatedAt"
+        FROM harmonica_tabs 
+        WHERE status = 'pending'
+        ORDER BY created_at DESC
+      `;
+      return data as SavedTab[];
+    } catch (error) {
+      console.error('Error fetching pending tabs:', error);
+      throw error;
+    }
+  }
   static async deleteTab(id: string): Promise<boolean> {
     try {
       const data = await sql`
@@ -116,15 +179,23 @@ export class TabsDB {
   }
 
   // Additional CRUD helper methods
-  static async getTabsByTitle(titlePattern: string): Promise<SavedTab[]> {
+  static async getTabsByTitle(titlePattern: string, includeAll: boolean = false): Promise<SavedTab[]> {
     try {
-      const data = await sql`
-        SELECT id, title, hole_history as "holeHistory", note_history as "noteHistory", 
-               created_at as "createdAt", updated_at as "updatedAt"
-        FROM harmonica_tabs 
-        WHERE title ILIKE ${`%${titlePattern}%`}
-        ORDER BY updated_at DESC
-      `;
+      const data = includeAll
+        ? await sql`
+            SELECT id, title, hole_history as "holeHistory", note_history as "noteHistory", 
+                   status, created_at as "createdAt", updated_at as "updatedAt"
+            FROM harmonica_tabs 
+            WHERE title ILIKE ${`%${titlePattern}%`}
+            ORDER BY updated_at DESC
+          `
+        : await sql`
+            SELECT id, title, hole_history as "holeHistory", note_history as "noteHistory", 
+                   status, created_at as "createdAt", updated_at as "updatedAt"
+            FROM harmonica_tabs 
+            WHERE title ILIKE ${`%${titlePattern}%`} AND status = 'approved'
+            ORDER BY updated_at DESC
+          `;
       return data as SavedTab[];
     } catch (error) {
       console.error('Error searching tabs by title:', error);
@@ -144,15 +215,24 @@ export class TabsDB {
     }
   }
 
-  static async getRecentTabs(limit: number = 10): Promise<SavedTab[]> {
+  static async getRecentTabs(limit: number = 10, includeAll: boolean = false): Promise<SavedTab[]> {
     try {
-      const data = await sql`
-        SELECT id, title, hole_history as "holeHistory", note_history as "noteHistory", 
-               created_at as "createdAt", updated_at as "updatedAt"
-        FROM harmonica_tabs 
-        ORDER BY updated_at DESC
-        LIMIT ${limit}
-      `;
+      const data = includeAll
+        ? await sql`
+            SELECT id, title, hole_history as "holeHistory", note_history as "noteHistory", 
+                   status, created_at as "createdAt", updated_at as "updatedAt"
+            FROM harmonica_tabs 
+            ORDER BY updated_at DESC
+            LIMIT ${limit}
+          `
+        : await sql`
+            SELECT id, title, hole_history as "holeHistory", note_history as "noteHistory", 
+                   status, created_at as "createdAt", updated_at as "updatedAt"
+            FROM harmonica_tabs 
+            WHERE status = 'approved'
+            ORDER BY updated_at DESC
+            LIMIT ${limit}
+          `;
       return data as SavedTab[];
     } catch (error) {
       console.error('Error fetching recent tabs:', error);

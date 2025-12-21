@@ -3,12 +3,14 @@ import { TabsDB, initializeDatabase, type SavedTab } from '../../../../lib/db';
 import { isAuthenticated, unauthorizedResponse } from '../../../../lib/auth';
 
 // GET /api/tabs - List all tabs
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     // Ensure database is initialized
     await initializeDatabase();
     
-    const tabs = await TabsDB.getAllTabs();
+    // If admin authenticated, show all tabs (including pending)
+    const includeAll = isAuthenticated(request);
+    const tabs = await TabsDB.getAllTabs(includeAll);
     return NextResponse.json(tabs);
   } catch (error) {
     console.error('Error listing tabs:', error);
@@ -16,13 +18,8 @@ export async function GET() {
   }
 }
 
-// POST /api/tabs - Create new tab
+// POST /api/tabs - Create new tab (pending approval)
 export async function POST(request: NextRequest) {
-  // Check authentication
-  if (!isAuthenticated(request)) {
-    return unauthorizedResponse();
-  }
-  
   try {
     const { title, holeHistory, noteHistory } = await request.json();
     
@@ -39,7 +36,10 @@ export async function POST(request: NextRequest) {
       noteHistory || ''
     );
     
-    return NextResponse.json(newTab, { status: 201 });
+    return NextResponse.json({ 
+      ...newTab, 
+      message: 'Tab created successfully. It will be visible after admin approval.' 
+    }, { status: 201 });
   } catch (error) {
     console.error('Error creating tab:', error);
     return NextResponse.json({ error: 'Failed to create tab' }, { status: 500 });
