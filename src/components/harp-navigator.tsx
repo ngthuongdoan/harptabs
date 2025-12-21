@@ -4,14 +4,22 @@
 import { useState, useMemo, useCallback, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import HarmonicaDiagram from './harmonica-diagram';
-import { getHarmonicaLayout, type Note, type HoleAction } from '@/lib/harmonica';
+import { getHarmonicaLayout, type Note, type HoleAction, type HarmonicaType, isDiatonicLayout, isTremoloLayout } from '@/lib/harmonica';
 import { Separator } from './ui/separator';
 import { Button } from './ui/button';
 import { CornerDownLeft, Trash2, Delete, Save, FolderOpen } from 'lucide-react';
 import SaveTabDialog from './save-tab-dialog';
 import SavedTabsManagerDialog from './saved-tabs-manager';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export default function HarpNavigator() {
+  const [harmonicaType, setHarmonicaType] = useState<HarmonicaType>('diatonic');
   const [selectedNote, setSelectedNote] = useState<Note | null>(null);
   const [selectedHoleInfo, setSelectedHoleInfo] = useState<{ hole: number; action: HoleAction } | null>(null);
   const [holeHistory, setHoleHistory] = useState<string>('');
@@ -19,7 +27,7 @@ export default function HarpNavigator() {
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [savedTabsDialogOpen, setSavedTabsDialogOpen] = useState(false);
 
-  const layout = useMemo(() => getHarmonicaLayout(), []);
+  const layout = useMemo(() => getHarmonicaLayout(harmonicaType), [harmonicaType]);
   const processingRef = useRef(false);
   const holeScrollRef = useRef<HTMLDivElement>(null);
   const noteScrollRef = useRef<HTMLDivElement>(null);
@@ -96,18 +104,33 @@ export default function HarpNavigator() {
 
     processingRef.current = true;
 
-    const note = layout[hole]?.note;
+    let note: Note | null = null;
+    let holeNotation: string;
+
+    // Get note based on layout type
+    if (isDiatonicLayout(layout)) {
+      note = layout[hole]?.[action];
+      // For diatonic: use + for blow, - for draw
+      holeNotation = action === 'blow' ? `+${hole}` : `-${hole}`;
+    } else if (isTremoloLayout(layout)) {
+      note = layout[hole]?.note;
+      // For tremolo: just use the hole number
+      holeNotation = hole.toString();
+    } else {
+      holeNotation = hole.toString();
+    }
+
     setSelectedHoleInfo({ hole, action });
     setSelectedNote(note || null);
     if (note) {
-      addToHistory(hole.toString(), note);
+      addToHistory(holeNotation, note);
     }
 
     // Reset the flag after a short delay
     setTimeout(() => {
       processingRef.current = false;
     }, 50);
-  }, [addToHistory]);
+  }, [layout, addToHistory]);
 
 
 
@@ -149,32 +172,32 @@ export default function HarpNavigator() {
     });
   };
 
-  const ResultDisplay = () => {
-    if (selectedHoleInfo) {
-      return (
-        <div className="text-center">
-          <p className="text-lg">Tab: <span className="font-bold font-headline text-accent">{selectedHoleInfo.hole} {selectedHoleInfo.action}</span></p>
-          <p className="text-lg">Note:
-            {selectedNote ? (
-              <span className="font-bold font-headline text-primary">{selectedNote}</span>
-            ) : (
-              <span className="text-muted-foreground"> (Invalid selection)</span>
-            )}
-          </p>
-        </div>
-      );
-    }
-    return <p className="text-center text-muted-foreground">Click on a harmonica hole to see the note.</p>;
-  };
-
   return (
     <Card className="w-full shadow-2xl">
       <CardHeader className="text-center">
         <CardTitle className="text-3xl font-headline">HarpTab Navigator</CardTitle>
-        <CardDescription>Your interactive guide to the diatonic harmonica.</CardDescription>
+        <CardDescription>Your interactive guide to the harmonica.</CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-6">
-        <p className="text-center text-muted-foreground">Click on a hole in the diagram below to see the note.</p>
+        <div className="flex flex-col items-center gap-3">
+          <p className="text-center text-muted-foreground">Select harmonica type and click on a hole to see the note.</p>
+          <div className="flex items-center gap-3">
+            <label htmlFor="harmonica-type" className="text-sm font-medium">Harmonica Type:</label>
+            <Select value={harmonicaType} onValueChange={(value: HarmonicaType) => {
+              setHarmonicaType(value);
+              setSelectedHoleInfo(null);
+              setSelectedNote(null);
+            }}>
+              <SelectTrigger id="harmonica-type" className="w-[180px]">
+                <SelectValue placeholder="Select type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="diatonic">Diatonic (10-hole)</SelectItem>
+                <SelectItem value="tremolo">Tremolo (24-hole)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
 
         <HarmonicaDiagram
           layout={layout}
