@@ -4,12 +4,13 @@
 import { useState, useMemo, useCallback, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import HarmonicaDiagram from './harmonica-diagram';
-import { getHarmonicaLayout, type Note, type HoleAction, type HarmonicaType, isDiatonicLayout, isTremoloLayout } from '@/lib/harmonica';
+import { getHarmonicaLayout, type Note, type HoleAction, type HarmonicaType, isDiatonicLayout, isTremoloLayout, convertDiatonicToTremolo, convertTremoloToDiatonic } from '@/lib/harmonica';
 import { Separator } from './ui/separator';
 import { Button } from './ui/button';
-import { CornerDownLeft, Trash2, Delete, Save, FolderOpen } from 'lucide-react';
+import { CornerDownLeft, Trash2, Delete, Save, FolderOpen, ArrowRightLeft } from 'lucide-react';
 import SaveTabDialog from './save-tab-dialog';
 import SavedTabsManagerDialog from './saved-tabs-manager';
+import { useToast } from '@/hooks/use-toast';
 import {
   Select,
   SelectContent,
@@ -26,6 +27,7 @@ export default function HarpNavigator() {
   const [noteHistory, setNoteHistory] = useState<string>('');
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [savedTabsDialogOpen, setSavedTabsDialogOpen] = useState(false);
+  const { toast } = useToast();
 
   const layout = useMemo(() => getHarmonicaLayout(harmonicaType), [harmonicaType]);
   const processingRef = useRef(false);
@@ -139,6 +141,46 @@ export default function HarpNavigator() {
     setNoteHistory('');
   };
 
+  const handleConvertTab = () => {
+    if (!holeHistory) {
+      toast({
+        title: "No tab to convert",
+        description: "Please create a tab first before converting.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const targetType = harmonicaType === 'diatonic' ? 'tremolo' : 'diatonic';
+    const result = harmonicaType === 'diatonic'
+      ? convertDiatonicToTremolo(holeHistory)
+      : convertTremoloToDiatonic(holeHistory);
+
+    if (result.success || result.convertedTab) {
+      setHoleHistory(result.convertedTab);
+      setHarmonicaType(targetType);
+      
+      toast({
+        title: "Tab converted!",
+        description: `Converted from ${harmonicaType} to ${targetType} notation.`,
+      });
+
+      if (result.warnings.length > 0) {
+        toast({
+          title: "Conversion warnings",
+          description: result.warnings.join(', '),
+          variant: "default"
+        });
+      }
+    } else {
+      toast({
+        title: "Conversion failed",
+        description: result.errors.join(', '),
+        variant: "destructive"
+      });
+    }
+  };
+
   const handleLoadTab = (holeHistory: string, noteHistory: string) => {
     setHoleHistory(holeHistory);
     setNoteHistory(noteHistory);
@@ -219,6 +261,10 @@ export default function HarpNavigator() {
                 <Button variant="outline" size="sm" onClick={() => setSaveDialogOpen(true)} disabled={!holeHistory && !noteHistory} className="flex-1 sm:flex-none">
                   <Save className="h-4 w-4 sm:mr-2" />
                   <span className="hidden sm:inline">Save</span>
+                </Button>
+                <Button variant="outline" size="sm" onClick={handleConvertTab} disabled={!holeHistory} className="flex-1 sm:flex-none">
+                  <ArrowRightLeft className="h-4 w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Convert</span>
                 </Button>
                 <Button variant="outline" size="sm" onClick={handleNewLine} disabled={!holeHistory && !noteHistory} className="flex-1 sm:flex-none">
                   <CornerDownLeft className="h-4 w-4 sm:mr-2" />
