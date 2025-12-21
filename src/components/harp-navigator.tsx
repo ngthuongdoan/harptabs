@@ -21,6 +21,9 @@ export default function HarpNavigator() {
 
   const layout = useMemo(() => getHarmonicaLayout(), []);
   const processingRef = useRef(false);
+  const holeScrollRef = useRef<HTMLDivElement>(null);
+  const noteScrollRef = useRef<HTMLDivElement>(null);
+  const isSyncingScroll = useRef(false);
 
   const addToHistory = useCallback((hole: string, note: string) => {
     setHoleHistory(prev => {
@@ -118,12 +121,40 @@ export default function HarpNavigator() {
     setNoteHistory(noteHistory);
   };
 
+  const handleHoleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    if (isSyncingScroll.current) return;
+    isSyncingScroll.current = true;
+
+    if (noteScrollRef.current) {
+      noteScrollRef.current.scrollTop = e.currentTarget.scrollTop;
+      noteScrollRef.current.scrollLeft = e.currentTarget.scrollLeft;
+    }
+
+    requestAnimationFrame(() => {
+      isSyncingScroll.current = false;
+    });
+  };
+
+  const handleNoteScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    if (isSyncingScroll.current) return;
+    isSyncingScroll.current = true;
+
+    if (holeScrollRef.current) {
+      holeScrollRef.current.scrollTop = e.currentTarget.scrollTop;
+      holeScrollRef.current.scrollLeft = e.currentTarget.scrollLeft;
+    }
+
+    requestAnimationFrame(() => {
+      isSyncingScroll.current = false;
+    });
+  };
+
   const ResultDisplay = () => {
     if (selectedHoleInfo) {
       return (
         <div className="text-center">
           <p className="text-lg">Tab: <span className="font-bold font-headline text-accent">{selectedHoleInfo.hole} {selectedHoleInfo.action}</span></p>
-          <p className="text-lg">Note: 
+          <p className="text-lg">Note:
             {selectedNote ? (
               <span className="font-bold font-headline text-primary">{selectedNote}</span>
             ) : (
@@ -135,7 +166,7 @@ export default function HarpNavigator() {
     }
     return <p className="text-center text-muted-foreground">Click on a harmonica hole to see the note.</p>;
   };
-  
+
   return (
     <Card className="w-full shadow-2xl">
       <CardHeader className="text-center">
@@ -143,48 +174,52 @@ export default function HarpNavigator() {
         <CardDescription>Your interactive guide to the diatonic harmonica.</CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-6">
-          <p className="text-center text-muted-foreground">Click on a hole in the diagram below to see the note.</p>
-          
-          <HarmonicaDiagram 
-            layout={layout}
-            selectedHoleInfo={selectedHoleInfo}
-            onHoleSelect={handleHoleSelect}
-          />
+        <p className="text-center text-muted-foreground">Click on a hole in the diagram below to see the note.</p>
 
-          <Separator />
+        <HarmonicaDiagram
+          layout={layout}
+          selectedHoleInfo={selectedHoleInfo}
+          onHoleSelect={handleHoleSelect}
+        />
 
-          <div className="flex flex-col gap-4">
-              <Card>
-                  <CardHeader className="flex flex-row items-center justify-between pb-2">
-                      <CardTitle className="text-lg font-medium">Tab History</CardTitle>
-                      <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={() => setSavedTabsDialogOpen(true)}>
-                  <FolderOpen className="h-4 w-4 mr-2" />
-                  Saved Tabs
+        <Separator />
+
+        <div className="flex flex-col gap-4">
+          <Card>
+            <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-2 gap-3">
+              <CardTitle className="text-lg font-medium">Tab History</CardTitle>
+              <div className="flex flex-wrap gap-2">
+                <Button variant="outline" size="sm" onClick={() => setSavedTabsDialogOpen(true)} className="flex-1 sm:flex-none">
+                  <FolderOpen className="h-4 w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Saved Tabs</span>
                 </Button>
-                <Button variant="outline" size="sm" onClick={() => setSaveDialogOpen(true)} disabled={!holeHistory && !noteHistory}>
-                  <Save className="h-4 w-4 mr-2" />
-                  Save
+                <Button variant="outline" size="sm" onClick={() => setSaveDialogOpen(true)} disabled={!holeHistory && !noteHistory} className="flex-1 sm:flex-none">
+                  <Save className="h-4 w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Save</span>
                 </Button>
-                <Button variant="outline" size="sm" onClick={handleNewLine} disabled={!holeHistory && !noteHistory}>
-                              <CornerDownLeft className="h-4 w-4 mr-2" />
-                              New Line
-                          </Button>
-                <Button variant="outline" size="sm" onClick={handleBackspace} disabled={!holeHistory && !noteHistory}>
-                  <Delete className="h-4 w-4 mr-2" />
-                  Backspace
+                <Button variant="outline" size="sm" onClick={handleNewLine} disabled={!holeHistory && !noteHistory} className="flex-1 sm:flex-none">
+                  <CornerDownLeft className="h-4 w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">New Line</span>
                 </Button>
-                <Button variant="destructive" size="sm" onClick={handleClearHistory} disabled={!holeHistory && !noteHistory}>
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              Clear
-                          </Button>
-                      </div>
-                  </CardHeader>
-                  <CardContent>
-              <div className="grid grid-cols-2 gap-6">
+                <Button variant="outline" size="sm" onClick={handleBackspace} disabled={!holeHistory && !noteHistory} className="flex-1 sm:flex-none">
+                  <Delete className="h-4 w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Backspace</span>
+                </Button>
+                <Button variant="destructive" size="sm" onClick={handleClearHistory} disabled={!holeHistory && !noteHistory} className="flex-1 sm:flex-none">
+                  <Trash2 className="h-4 w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Clear</span>
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
                 <div>
                   <h3 className="font-semibold text-sm uppercase text-muted-foreground tracking-wider mb-2">Hole Numbers</h3>
-                  <div className="p-4 bg-background/50 rounded-lg min-h-[60px] max-h-[200px] text-lg font-mono overflow-y-auto">
+                  <div
+                    ref={holeScrollRef}
+                    onScroll={handleHoleScroll}
+                    className="p-4 bg-background/50 rounded-lg min-h-[60px] max-h-[200px] text-base md:text-lg font-mono overflow-y-auto"
+                  >
                     {!holeHistory ? (
                       <p className="text-muted-foreground text-sm">Hole numbers will appear here.</p>
                     ) : (
@@ -194,20 +229,24 @@ export default function HarpNavigator() {
                 </div>
                 <div>
                   <h3 className="font-semibold text-sm uppercase text-muted-foreground tracking-wider mb-2">Note Letters</h3>
-                  <div className="p-4 bg-background/50 rounded-lg min-h-[60px] max-h-[200px] text-lg font-mono overflow-y-auto">
+                  <div
+                    ref={noteScrollRef}
+                    onScroll={handleNoteScroll}
+                    className="p-4 bg-background/50 rounded-lg min-h-[60px] max-h-[200px] text-base md:text-lg font-mono overflow-y-auto"
+                  >
                     {!noteHistory ? (
                       <p className="text-muted-foreground text-sm">Note letters will appear here.</p>
                     ) : (
                       <pre className="break-words whitespace-pre-wrap">{noteHistory}</pre>
                     )}
                   </div>
-                          </div>
-                      </div>
-                  </CardContent>
-              </Card>
-          </div>
-          
-          <Separator />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Separator />
 
         <div className="flex flex-col gap-4">
           <Card>
@@ -226,7 +265,7 @@ export default function HarpNavigator() {
               </div>
             </CardContent>
           </Card>
-          </div>
+        </div>
       </CardContent>
 
       <SaveTabDialog

@@ -2,15 +2,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { TabsDB, initializeDatabase, type SavedTab } from '../../../../../lib/db';
 
 interface RouteParams {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 }
 
 // GET /api/tabs/[id] - Get specific tab
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
-    const { id } = params;
+    const { id } = await params;
     await initializeDatabase();
     
     const tab = await TabsDB.getTab(id);
@@ -28,7 +28,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 // PUT /api/tabs/[id] - Update tab
 export async function PUT(request: NextRequest, { params }: RouteParams) {
   try {
-    const { id } = params;
+    const { id } = await params;
     const { title, holeHistory, noteHistory } = await request.json();
     
     if (!title || typeof title !== 'string') {
@@ -58,7 +58,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
 // DELETE /api/tabs/[id] - Delete tab
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
   try {
-    const { id } = params;
+    const { id } = await params;
     await initializeDatabase();
     
     const success = await TabsDB.deleteTab(id);

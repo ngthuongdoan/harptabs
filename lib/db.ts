@@ -104,7 +104,9 @@ export class TabsDB {
   static async deleteTab(id: string): Promise<boolean> {
     try {
       const data = await sql`
-        DELETE FROM harmonica_tabs WHERE id = ${id}
+        DELETE FROM harmonica_tabs 
+        WHERE id = ${id}
+        RETURNING id
       `;
       return data.length > 0;
     } catch (error) {
