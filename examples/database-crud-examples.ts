@@ -3,6 +3,9 @@
  * Using Neon Database with @neondatabase/serverless
  */
 
+// Load environment variables
+import 'dotenv/config';
+
 import { TabsDB, SavedTab, initializeDatabase } from '../lib/db';
 import { BatchTabsDB, AdvancedTabsDB, TabsDBExamples } from '../lib/db-utils';
 
