@@ -3,6 +3,8 @@ export interface SavedTab {
   title: string;
   holeHistory: string;
   noteHistory: string;
+  harmonicaType: 'diatonic' | 'tremolo';
+  status: 'pending' | 'approved';
   createdAt: Date;
   updatedAt: Date;
 }

@@ -165,9 +165,14 @@ export default function PendingTabsAdmin({ apiKey }: PendingTabsAdminProps) {
                     Submitted on {formatDate(tab.createdAt)}
                   </CardDescription>
                 </div>
-                <Badge variant="outline" className="bg-yellow-500/10 text-yellow-600 border-yellow-500/20">
-                  Pending
-                </Badge>
+                <div className="flex gap-2">
+                  <Badge variant="outline" className={tab.harmonicaType === 'tremolo' ? 'bg-purple-100 dark:bg-purple-950' : 'bg-blue-100 dark:bg-blue-950'}>
+                    {tab.harmonicaType === 'tremolo' ? 'Tremolo' : 'Diatonic'}
+                  </Badge>
+                  <Badge variant="outline" className="bg-yellow-500/10 text-yellow-600 border-yellow-500/20">
+                    Pending
+                  </Badge>
+                </div>
               </div>
             </CardHeader>
             <CardContent>

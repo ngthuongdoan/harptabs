@@ -7,9 +7,34 @@ export interface SavedTab {
   title: string;
   holeHistory: string;
   noteHistory: string;
+  harmonicaType: 'diatonic' | 'tremolo';
   status: 'pending' | 'approved';
   createdAt: Date;
   updatedAt: Date;
+}
+
+// Helper function to detect harmonica type from hole history
+export function detectHarmonicaType(holeHistory: string): 'diatonic' | 'tremolo' {
+  if (!holeHistory || holeHistory.trim() === '') {
+    return 'diatonic'; // default
+  }
+  
+  // Parse hole history to find highest hole number
+  const holeNumbers = holeHistory
+    .split('\n')
+    .flatMap(line => line.match(/\d+/g) || [])
+    .map(Number)
+    .filter(n => !isNaN(n));
+  
+  if (holeNumbers.length === 0) {
+    return 'diatonic';
+  }
+  
+  const maxHole = Math.max(...holeNumbers);
+  
+  // Tremolo harmonicas typically have 21-24 holes
+  // Diatonic harmonicas typically have 10 holes
+  return maxHole > 10 ? 'tremolo' : 'diatonic';
 }
 
 // Initialize database tables
@@ -34,6 +59,12 @@ export async function initializeDatabase() {
       ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'approved'
     `;
     
+    // Add harmonica_type column if it doesn't exist
+    await sql`
+      ALTER TABLE harmonica_tabs 
+      ADD COLUMN IF NOT EXISTS harmonica_type VARCHAR(20) DEFAULT 'diatonic'
+    `;
+    
     // Approve all existing tabs (one-time migration)
     // This ensures tabs created before the review system are visible
     await sql`
@@ -41,6 +72,27 @@ export async function initializeDatabase() {
       SET status = 'approved' 
       WHERE status IS NULL OR status = ''
     `;
+    
+    // Migrate existing tabs to detect harmonica type (one-time migration)
+    // This reads all tabs and sets the correct harmonica_type based on hole_history
+    const existingTabs = await sql`
+      SELECT id, hole_history 
+      FROM harmonica_tabs 
+      WHERE harmonica_type IS NULL OR harmonica_type = ''
+    `;
+    
+    for (const tab of existingTabs) {
+      const detectedType = detectHarmonicaType(tab.hole_history);
+      await sql`
+        UPDATE harmonica_tabs 
+        SET harmonica_type = ${detectedType}
+        WHERE id = ${tab.id}
+      `;
+    }
+    
+    if (existingTabs.length > 0) {
+      console.log(`Migrated ${existingTabs.length} existing tabs with detected harmonica types`);
+    }
     
     console.log('Database initialized successfully');
   } catch (error) {
@@ -56,13 +108,13 @@ export class TabsDB {
       const data = includeAll
         ? await sql`
             SELECT id, title, hole_history as "holeHistory", note_history as "noteHistory", 
-                   status, created_at as "createdAt", updated_at as "updatedAt"
+                   harmonica_type as "harmonicaType", status, created_at as "createdAt", updated_at as "updatedAt"
             FROM harmonica_tabs 
             ORDER BY updated_at DESC
           `
         : await sql`
             SELECT id, title, hole_history as "holeHistory", note_history as "noteHistory", 
-                   status, created_at as "createdAt", updated_at as "updatedAt"
+                   harmonica_type as "harmonicaType", status, created_at as "createdAt", updated_at as "updatedAt"
             FROM harmonica_tabs 
             WHERE status = 'approved'
             ORDER BY updated_at DESC
@@ -79,13 +131,13 @@ export class TabsDB {
       const data = includeAll
         ? await sql`
             SELECT id, title, hole_history as "holeHistory", note_history as "noteHistory", 
-                   status, created_at as "createdAt", updated_at as "updatedAt"
+                   harmonica_type as "harmonicaType", status, created_at as "createdAt", updated_at as "updatedAt"
             FROM harmonica_tabs 
             WHERE id = ${id}
           `
         : await sql`
             SELECT id, title, hole_history as "holeHistory", note_history as "noteHistory", 
-                   status, created_at as "createdAt", updated_at as "updatedAt"
+                   harmonica_type as "harmonicaType", status, created_at as "createdAt", updated_at as "updatedAt"
             FROM harmonica_tabs 
             WHERE id = ${id} AND status = 'approved'
           `;
@@ -100,12 +152,13 @@ export class TabsDB {
     try {
       const now = new Date();
       const id = `tab-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const harmonicaType = detectHarmonicaType(holeHistory);
       
       const data = await sql`
-        INSERT INTO harmonica_tabs (id, title, hole_history, note_history, status, created_at, updated_at)
-        VALUES (${id}, ${title}, ${holeHistory}, ${noteHistory}, 'pending', ${now.toISOString()}, ${now.toISOString()})
+        INSERT INTO harmonica_tabs (id, title, hole_history, note_history, harmonica_type, status, created_at, updated_at)
+        VALUES (${id}, ${title}, ${holeHistory}, ${noteHistory}, ${harmonicaType}, 'pending', ${now.toISOString()}, ${now.toISOString()})
         RETURNING id, title, hole_history as "holeHistory", note_history as "noteHistory", 
-                  status, created_at as "createdAt", updated_at as "updatedAt"
+                  harmonica_type as "harmonicaType", status, created_at as "createdAt", updated_at as "updatedAt"
       `;
       return data[0] as SavedTab;
     } catch (error) {
@@ -117,13 +170,15 @@ export class TabsDB {
   static async updateTab(id: string, title: string, holeHistory: string, noteHistory: string): Promise<SavedTab | null> {
     try {
       const now = new Date();
+      const harmonicaType = detectHarmonicaType(holeHistory);
       
       const data = await sql`
         UPDATE harmonica_tabs 
-        SET title = ${title}, hole_history = ${holeHistory}, note_history = ${noteHistory}, updated_at = ${now.toISOString()}
+        SET title = ${title}, hole_history = ${holeHistory}, note_history = ${noteHistory}, 
+            harmonica_type = ${harmonicaType}, updated_at = ${now.toISOString()}
         WHERE id = ${id}
         RETURNING id, title, hole_history as "holeHistory", note_history as "noteHistory", 
-                  status, created_at as "createdAt", updated_at as "updatedAt"
+                  harmonica_type as "harmonicaType", status, created_at as "createdAt", updated_at as "updatedAt"
       `;
       return data[0] as SavedTab || null;
     } catch (error) {
@@ -140,7 +195,7 @@ export class TabsDB {
         SET status = 'approved', updated_at = ${now.toISOString()}
         WHERE id = ${id}
         RETURNING id, title, hole_history as "holeHistory", note_history as "noteHistory", 
-                  status, created_at as "createdAt", updated_at as "updatedAt"
+                  harmonica_type as "harmonicaType", status, created_at as "createdAt", updated_at as "updatedAt"
       `;
       return data[0] as SavedTab || null;
     } catch (error) {
@@ -153,7 +208,7 @@ export class TabsDB {
     try {
       const data = await sql`
         SELECT id, title, hole_history as "holeHistory", note_history as "noteHistory", 
-               status, created_at as "createdAt", updated_at as "updatedAt"
+               harmonica_type as "harmonicaType", status, created_at as "createdAt", updated_at as "updatedAt"
         FROM harmonica_tabs 
         WHERE status = 'pending'
         ORDER BY created_at DESC
@@ -184,14 +239,14 @@ export class TabsDB {
       const data = includeAll
         ? await sql`
             SELECT id, title, hole_history as "holeHistory", note_history as "noteHistory", 
-                   status, created_at as "createdAt", updated_at as "updatedAt"
+                   harmonica_type as "harmonicaType", status, created_at as "createdAt", updated_at as "updatedAt"
             FROM harmonica_tabs 
             WHERE title ILIKE ${`%${titlePattern}%`}
             ORDER BY updated_at DESC
           `
         : await sql`
             SELECT id, title, hole_history as "holeHistory", note_history as "noteHistory", 
-                   status, created_at as "createdAt", updated_at as "updatedAt"
+                   harmonica_type as "harmonicaType", status, created_at as "createdAt", updated_at as "updatedAt"
             FROM harmonica_tabs 
             WHERE title ILIKE ${`%${titlePattern}%`} AND status = 'approved'
             ORDER BY updated_at DESC
@@ -220,14 +275,14 @@ export class TabsDB {
       const data = includeAll
         ? await sql`
             SELECT id, title, hole_history as "holeHistory", note_history as "noteHistory", 
-                   status, created_at as "createdAt", updated_at as "updatedAt"
+                   harmonica_type as "harmonicaType", status, created_at as "createdAt", updated_at as "updatedAt"
             FROM harmonica_tabs 
             ORDER BY updated_at DESC
             LIMIT ${limit}
           `
         : await sql`
             SELECT id, title, hole_history as "holeHistory", note_history as "noteHistory", 
-                   status, created_at as "createdAt", updated_at as "updatedAt"
+                   harmonica_type as "harmonicaType", status, created_at as "createdAt", updated_at as "updatedAt"
             FROM harmonica_tabs 
             WHERE status = 'approved'
             ORDER BY updated_at DESC

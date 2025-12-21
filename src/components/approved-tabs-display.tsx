@@ -78,7 +78,12 @@ export default function ApprovedTabsDisplay() {
             <CardHeader>
               <div className="flex items-start justify-between">
                 <CardTitle className="text-lg line-clamp-2">{tab.title}</CardTitle>
-                <Badge variant="secondary">Approved</Badge>
+                <div className="flex gap-2">
+                  <Badge variant="secondary">Approved</Badge>
+                  <Badge variant="outline" className={tab.harmonicaType === 'tremolo' ? 'bg-purple-100 dark:bg-purple-950' : 'bg-blue-100 dark:bg-blue-950'}>
+                    {tab.harmonicaType === 'tremolo' ? 'Tremolo' : 'Diatonic'}
+                  </Badge>
+                </div>
               </div>
               <CardDescription className="flex items-center gap-2 text-xs">
                 <Calendar className="h-3 w-3" />
@@ -108,10 +113,17 @@ export default function ApprovedTabsDisplay() {
       {selectedTab && (
         <Card className="mt-6">
           <CardHeader>
-            <CardTitle>{selectedTab.title}</CardTitle>
-            <CardDescription>
-              Created on {formatDate(selectedTab.createdAt)}
-            </CardDescription>
+            <div className="flex items-start justify-between">
+              <div>
+                <CardTitle>{selectedTab.title}</CardTitle>
+                <CardDescription>
+                  Created on {formatDate(selectedTab.createdAt)}
+                </CardDescription>
+              </div>
+              <Badge variant="outline" className={selectedTab.harmonicaType === 'tremolo' ? 'bg-purple-100 dark:bg-purple-950' : 'bg-blue-100 dark:bg-blue-950'}>
+                {selectedTab.harmonicaType === 'tremolo' ? '24-Hole Tremolo' : '10-Hole Diatonic'}
+              </Badge>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

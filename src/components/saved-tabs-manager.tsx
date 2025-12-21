@@ -163,6 +163,9 @@ export default function SavedTabsManagerDialog({
                           {new Date(tab.createdAt).getTime() !== new Date(tab.updatedAt).getTime() && (
                             <Badge variant="secondary" className="ml-2">Edited</Badge>
                           )}
+                          <Badge variant="outline" className={tab.harmonicaType === 'tremolo' ? 'bg-purple-100 dark:bg-purple-950 ml-2' : 'bg-blue-100 dark:bg-blue-950 ml-2'}>
+                            {tab.harmonicaType === 'tremolo' ? 'Tremolo' : 'Diatonic'}
+                          </Badge>
                         </div>
                       </CardHeader>
                       <CardContent>
