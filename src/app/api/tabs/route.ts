@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { TabsDB, initializeDatabase, type SavedTab } from '../../../../lib/db';
+import { isAuthenticated, unauthorizedResponse } from '../../../../lib/auth';
 
 // GET /api/tabs - List all tabs
 export async function GET() {
@@ -17,6 +18,11 @@ export async function GET() {
 
 // POST /api/tabs - Create new tab
 export async function POST(request: NextRequest) {
+  // Check authentication
+  if (!isAuthenticated(request)) {
+    return unauthorizedResponse();
+  }
+  
   try {
     const { title, holeHistory, noteHistory } = await request.json();
     

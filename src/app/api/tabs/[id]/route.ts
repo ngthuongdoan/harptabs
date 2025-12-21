@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { TabsDB, initializeDatabase, type SavedTab } from '../../../../../lib/db';
+import { isAuthenticated, unauthorizedResponse } from '../../../../../lib/auth';
 
 interface RouteParams {
   params: Promise<{
@@ -27,6 +28,11 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
 // PUT /api/tabs/[id] - Update tab
 export async function PUT(request: NextRequest, { params }: RouteParams) {
+  // Check authentication
+  if (!isAuthenticated(request)) {
+    return unauthorizedResponse();
+  }
+  
   try {
     const { id } = await params;
     const { title, holeHistory, noteHistory } = await request.json();
@@ -57,6 +63,11 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
 
 // DELETE /api/tabs/[id] - Delete tab
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
+  // Check authentication
+  if (!isAuthenticated(request)) {
+    return unauthorizedResponse();
+  }
+  
   try {
     const { id } = await params;
     await initializeDatabase();
