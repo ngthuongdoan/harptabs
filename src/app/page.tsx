@@ -5,7 +5,7 @@ import ApprovedTabsDisplay from "@/components/approved-tabs-display";
 import PendingTabsAdmin from "@/components/pending-tabs-admin";
 import AdminLogin from "@/components/admin-login";
 import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
+import { Plus, Mic } from "lucide-react";
 import Link from "next/link";
 
 export default function Home() {
@@ -27,6 +27,12 @@ export default function Home() {
             </div>
             <div className="flex gap-2">
               <AdminLogin />
+              <Link href="/pitch-detector">
+                <Button variant="outline">
+                  <Mic className="h-4 w-4 mr-2" />
+                  Pitch Detector
+                </Button>
+              </Link>
               <Link href="/create">
                 <Button>
                   <Plus className="h-4 w-4 mr-2" />
