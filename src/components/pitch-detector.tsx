@@ -172,65 +172,63 @@ export default function PitchDetector() {
 
             {/* Pitch display */}
             <div className="space-y-4">
-              {/* Pitch display */}
-              <div className="space-y-4">
-                {pitchData ? (
-                  <>
-                    <div className="text-center space-y-2">
-                      <div className="text-6xl font-bold font-headline">
-                        {pitchData.note}
-                      </div>
-                      <div className="text-2xl text-muted-foreground">
-                        {pitchData.frequency} Hz
-                      </div>
-                      {pitchData.cents !== 0 && (
-                        <div className="text-sm text-muted-foreground">
-                          {pitchData.cents > 0 ? "+" : ""}
-                          {pitchData.cents} cents
-                        </div>
-                      )}
+              {pitchData ? (
+                <>
+                  <div className="text-center space-y-2">
+                    <div className="text-6xl font-bold font-headline">
+                      {pitchData.note}
                     </div>
-
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span>Clarity</span>
-                        <span>{Math.round(pitchData.clarity * 100)}%</span>
-                      </div>
-                      <Progress value={pitchData.clarity * 100} className="h-2" />
+                    <div className="text-2xl text-muted-foreground">
+                      {pitchData.frequency} Hz
                     </div>
-
-                    {/* Tuning indicator */}
-                    <div className="relative h-12 bg-muted rounded-lg overflow-hidden">
-                      <div className="absolute inset-y-0 left-1/2 w-0.5 bg-primary z-10" />
-                      <div
-                        className="absolute inset-y-0 w-1 bg-foreground transition-all duration-100"
-                        style={{
-                          left: `calc(50% + ${(pitchData.cents / 50) * 25}%)`,
-                        }}
-                      />
-                      <div className="absolute inset-0 flex items-center justify-between px-4 text-xs text-muted-foreground">
-                        <span>♭ Flat</span>
-                        <span>In Tune</span>
-                        <span>Sharp ♯</span>
+                    {pitchData.cents !== 0 && (
+                      <div className="text-sm text-muted-foreground">
+                        {pitchData.cents > 0 ? "+" : ""}
+                        {pitchData.cents} cents
                       </div>
-                    </div>
-                  </>
-                ) : (
-                  <div className="text-center text-muted-foreground py-12">
-                    <Mic className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                    <p>
-                      {mode === "microphone"
-                        ? "Play a note on your harmonica..."
-                        : isPlaying
-                          ? "Listening for pitch..."
-                          : "Click play to start analyzing"}
-                    </p>
+                    )}
                   </div>
-                )}
-              </div>
-            </>
+
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span>Clarity</span>
+                      <span>{Math.round(pitchData.clarity * 100)}%</span>
+                    </div>
+                    <Progress value={pitchData.clarity * 100} className="h-2" />
+                  </div>
+
+                  {/* Tuning indicator */}
+                  <div className="relative h-12 bg-muted rounded-lg overflow-hidden">
+                    <div className="absolute inset-y-0 left-1/2 w-0.5 bg-primary z-10" />
+                    <div
+                      className="absolute inset-y-0 w-1 bg-foreground transition-all duration-100"
+                      style={{
+                        left: `calc(50% + ${(pitchData.cents / 50) * 25}%)`,
+                      }}
+                    />
+                    <div className="absolute inset-0 flex items-center justify-between px-4 text-xs text-muted-foreground">
+                      <span>♭ Flat</span>
+                      <span>In Tune</span>
+                      <span>Sharp ♯</span>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="text-center text-muted-foreground py-12">
+                  <Mic className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>
+                    {mode === "microphone"
+                      ? "Play a note on your harmonica..."
+                      : isPlaying
+                        ? "Listening for pitch..."
+                        : "Click play to start analyzing"}
+                  </p>
+                </div>
+              )}
+            </div>
+          </>
         )}
-          </CardContent>
+      </CardContent>
     </Card>
   );
 }
