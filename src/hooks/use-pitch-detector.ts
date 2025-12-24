@@ -37,6 +37,7 @@ export function usePitchDetector() {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [fileName, setFileName] = useState<string | null>(null);
+  const [isLoadingYoutube, setIsLoadingYoutube] = useState(false);
   
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
@@ -147,6 +148,61 @@ export function usePitchDetector() {
       const errorMessage = err instanceof Error ? err.message : "Failed to load audio file";
       setError(errorMessage);
       console.error("Error loading audio file:", err);
+    }
+  }, []);
+
+  const loadYoutubeAudio = useCallback(async (url: string) => {
+    try {
+      setError(null);
+      setIsLoadingYoutube(true);
+
+      // Call API route to download YouTube audio
+      const response = await fetch(`/api/youtube-audio?url=${encodeURIComponent(url)}`);
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to download YouTube audio');
+      }
+
+      // Get the audio blob
+      const blob = await response.blob();
+      
+      // Extract filename from Content-Disposition header or use default
+      const contentDisposition = response.headers.get('Content-Disposition');
+      const filenameMatch = contentDisposition?.match(/filename="(.+)"/);
+      const filename = filenameMatch ? decodeURIComponent(filenameMatch[1]) : 'YouTube Audio.mp3';
+      
+      setFileName(filename);
+
+      // Read blob as array buffer
+      const arrayBuffer = await blob.arrayBuffer();
+
+      // Create audio context
+      const audioContext = new AudioContext();
+      const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+
+      // Create analyser
+      const analyser = audioContext.createAnalyser();
+      analyser.fftSize = 2048;
+
+      audioContextRef.current = audioContext;
+      analyserRef.current = analyser;
+      audioBufferRef.current = audioBuffer;
+
+      // Create pitch detector
+      detectorRef.current = PitchDetector.forFloat32Array(analyser.fftSize);
+
+      setDuration(audioBuffer.duration);
+      setCurrentTime(0);
+      setMode("file");
+      setIsListening(true);
+      setIsPlaying(false);
+      setIsLoadingYoutube(false);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "Failed to load YouTube audio";
+      setError(errorMessage);
+      console.error("Error loading YouTube audio:", err);
+      setIsLoadingYoutube(false);
     }
   }, []);
 
@@ -273,9 +329,11 @@ export function usePitchDetector() {
     currentTime,
     duration,
     fileName,
+    isLoadingYoutube,
     startListening,
     stopListening,
     loadAudioFile,
+    loadYoutubeAudio,
     playAudio,
     pauseAudio,
     seekAudio,
