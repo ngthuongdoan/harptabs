@@ -83,7 +83,7 @@ export default function PitchDetector() {
               <TabsTrigger value="file">Upload File</TabsTrigger>
               <TabsTrigger value="youtube">YouTube</TabsTrigger>
             </TabsList>
-            
+
             <TabsContent value="microphone" className="space-y-4">
               <div className="flex justify-center py-4">
                 <Button size="lg" onClick={startListening} className="w-40">
@@ -132,8 +132,8 @@ export default function PitchDetector() {
                     }}
                     disabled={isLoadingYoutube}
                   />
-                  <Button 
-                    onClick={handleYoutubeLoad} 
+                  <Button
+                    onClick={handleYoutubeLoad}
                     disabled={!youtubeUrl.trim() || isLoadingYoutube}
                     className="min-w-[100px]"
                   >
