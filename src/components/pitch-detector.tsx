@@ -4,12 +4,11 @@ import { usePitchDetector } from "@/hooks/use-pitch-detector";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Mic, MicOff, AlertCircle, Upload, Play, Pause, X, Youtube, Loader2 } from "lucide-react";
+import { Mic, MicOff, AlertCircle, Upload, Play, Pause, X } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Slider } from "@/components/ui/slider";
-import { Input } from "@/components/ui/input";
-import { useRef, useState } from "react";
+import { useRef } from "react";
 
 function formatTime(seconds: number): string {
   const mins = Math.floor(seconds / 60);
@@ -27,18 +26,15 @@ export default function PitchDetector() {
     currentTime,
     duration,
     fileName,
-    isLoadingYoutube,
     startListening,
     stopListening,
     loadAudioFile,
-    loadYoutubeAudio,
     playAudio,
     pauseAudio,
     seekAudio,
   } = usePitchDetector();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [youtubeUrl, setYoutubeUrl] = useState("");
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -49,12 +45,6 @@ export default function PitchDetector() {
 
   const handleFileUploadClick = () => {
     fileInputRef.current?.click();
-  };
-
-  const handleYoutubeLoad = async () => {
-    if (youtubeUrl.trim()) {
-      await loadYoutubeAudio(youtubeUrl.trim());
-    }
   };
 
   return (
@@ -78,10 +68,9 @@ export default function PitchDetector() {
 
         {!isListening && (
           <Tabs defaultValue="microphone" className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="microphone">Microphone</TabsTrigger>
               <TabsTrigger value="file">Upload File</TabsTrigger>
-              <TabsTrigger value="youtube">YouTube</TabsTrigger>
             </TabsList>
 
             <TabsContent value="microphone" className="space-y-4">
@@ -114,46 +103,6 @@ export default function PitchDetector() {
               <div className="text-center text-sm text-muted-foreground space-y-2">
                 <p>Upload an audio file to analyze pitch</p>
                 <p className="text-xs">Supports MP3, WAV, OGG, and other audio formats</p>
-              </div>
-            </TabsContent>
-
-            <TabsContent value="youtube" className="space-y-4">
-              <div className="space-y-3 py-4">
-                <div className="flex gap-2">
-                  <Input
-                    type="text"
-                    placeholder="Paste YouTube URL here..."
-                    value={youtubeUrl}
-                    onChange={(e) => setYoutubeUrl(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && !isLoadingYoutube) {
-                        handleYoutubeLoad();
-                      }
-                    }}
-                    disabled={isLoadingYoutube}
-                  />
-                  <Button
-                    onClick={handleYoutubeLoad}
-                    disabled={!youtubeUrl.trim() || isLoadingYoutube}
-                    className="min-w-[100px]"
-                  >
-                    {isLoadingYoutube ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Loading
-                      </>
-                    ) : (
-                      <>
-                        <Youtube className="h-4 w-4 mr-2" />
-                        Load
-                      </>
-                    )}
-                  </Button>
-                </div>
-              </div>
-              <div className="text-center text-sm text-muted-foreground space-y-2">
-                <p>Paste a YouTube video URL to extract and analyze its audio</p>
-                <p className="text-xs">Example: https://www.youtube.com/watch?v=...</p>
               </div>
             </TabsContent>
           </Tabs>
@@ -222,7 +171,7 @@ export default function PitchDetector() {
             )}
 
             {/* Pitch display */}
-            <div className="space-y-4">
+            <div className="space-y-4 min-h-[400px] flex flex-col justify-center">
               {pitchData ? (
                 <>
                   <div className="text-center space-y-2">
