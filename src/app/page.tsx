@@ -25,16 +25,16 @@ export default function Home() {
                   : "Discover and create harmonica tabs"}
               </p>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
               <AdminLogin />
-              <Link href="/pitch-detector">
-                <Button variant="outline">
+              <Link href="/pitch-detector" className="w-full sm:w-auto">
+                <Button variant="outline" className="w-full sm:w-auto">
                   <Mic className="h-4 w-4 mr-2" />
                   Pitch Detector
                 </Button>
               </Link>
-              <Link href="/create">
-                <Button>
+              <Link href="/create" className="w-full sm:w-auto">
+                <Button className="w-full sm:w-auto">
                   <Plus className="h-4 w-4 mr-2" />
                   Create Tab
                 </Button>
