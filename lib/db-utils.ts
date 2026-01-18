@@ -17,7 +17,14 @@ export class BatchTabsDB {
       const results: SavedTab[] = [];
       
       for (const tab of tabs) {
-        const result = await TabsDB.createTab(tab.title, tab.holeHistory, tab.noteHistory);
+        const result = await TabsDB.createTab(
+          tab.title,
+          tab.holeHistory,
+          tab.noteHistory,
+          "Beginner",
+          "C",
+          "Unknown"
+        );
         results.push(result);
       }
       
@@ -72,19 +79,28 @@ export class AdvancedTabsDB {
   /**
    * Get tabs with pagination
    */
-  static async getTabsPaginated(page: number = 1, limit: number = 10): Promise<{tabs: SavedTab[], total: number, totalPages: number}> {
+  static async getTabsPaginated(
+    page: number = 1,
+    limit: number = 10,
+    includeAll: boolean = false
+  ): Promise<{tabs: SavedTab[], total: number, totalPages: number}> {
     try {
       const offset = (page - 1) * limit;
       
       const [tabs, totalResult] = await Promise.all([
         sql`
           SELECT id, title, hole_history as "holeHistory", note_history as "noteHistory", 
-                 created_at as "createdAt", updated_at as "updatedAt"
+                 harmonica_type as "harmonicaType", difficulty, genre, music_key as "key",
+                 rejection_reason as "rejectionReason",
+                 status, created_at as "createdAt", updated_at as "updatedAt"
           FROM harmonica_tabs 
+          ${includeAll ? sql`` : sql`WHERE status = 'approved'`}
           ORDER BY updated_at DESC
           LIMIT ${limit} OFFSET ${offset}
         `,
-        sql`SELECT COUNT(*) as count FROM harmonica_tabs`
+        includeAll
+          ? sql`SELECT COUNT(*) as count FROM harmonica_tabs`
+          : sql`SELECT COUNT(*) as count FROM harmonica_tabs WHERE status = 'approved'`
       ]);
 
       const total = Number(totalResult[0].count);
@@ -110,15 +126,22 @@ export class AdvancedTabsDB {
     createdBefore?: Date;
     updatedAfter?: Date;
     updatedBefore?: Date;
-  }): Promise<SavedTab[]> {
+  }, includeAll: boolean = false): Promise<SavedTab[]> {
     try {
       let query = `
         SELECT id, title, hole_history as "holeHistory", note_history as "noteHistory", 
-               created_at as "createdAt", updated_at as "updatedAt"
+               harmonica_type as "harmonicaType", difficulty, genre, music_key as "key",
+               rejection_reason as "rejectionReason",
+               status, created_at as "createdAt", updated_at as "updatedAt"
         FROM harmonica_tabs 
         WHERE 1=1
       `;
       const params: any[] = [];
+
+      if (!includeAll) {
+        query += ` AND status = $${params.length + 1}`;
+        params.push('approved');
+      }
 
       if (criteria.title) {
         query += ` AND title ILIKE $${params.length + 1}`;
@@ -158,7 +181,7 @@ export class AdvancedTabsDB {
   /**
    * Get tabs statistics
    */
-  static async getTabsStats(): Promise<{
+  static async getTabsStats(includeAll: boolean = false): Promise<{
     total: number;
     createdToday: number;
     createdThisWeek: number;
@@ -170,12 +193,21 @@ export class AdvancedTabsDB {
       const startOfWeek = new Date(startOfDay.getTime() - (startOfDay.getDay() * 24 * 60 * 60 * 1000));
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
-      const [total, today, week, month] = await Promise.all([
-        sql`SELECT COUNT(*) as count FROM harmonica_tabs`,
-        sql`SELECT COUNT(*) as count FROM harmonica_tabs WHERE created_at >= ${startOfDay.toISOString()}`,
-        sql`SELECT COUNT(*) as count FROM harmonica_tabs WHERE created_at >= ${startOfWeek.toISOString()}`,
-        sql`SELECT COUNT(*) as count FROM harmonica_tabs WHERE created_at >= ${startOfMonth.toISOString()}`
-      ]);
+      const [total, today, week, month] = await Promise.all(
+        includeAll
+          ? [
+              sql`SELECT COUNT(*) as count FROM harmonica_tabs`,
+              sql`SELECT COUNT(*) as count FROM harmonica_tabs WHERE created_at >= ${startOfDay.toISOString()}`,
+              sql`SELECT COUNT(*) as count FROM harmonica_tabs WHERE created_at >= ${startOfWeek.toISOString()}`,
+              sql`SELECT COUNT(*) as count FROM harmonica_tabs WHERE created_at >= ${startOfMonth.toISOString()}`
+            ]
+          : [
+              sql`SELECT COUNT(*) as count FROM harmonica_tabs WHERE status = 'approved'`,
+              sql`SELECT COUNT(*) as count FROM harmonica_tabs WHERE status = 'approved' AND created_at >= ${startOfDay.toISOString()}`,
+              sql`SELECT COUNT(*) as count FROM harmonica_tabs WHERE status = 'approved' AND created_at >= ${startOfWeek.toISOString()}`,
+              sql`SELECT COUNT(*) as count FROM harmonica_tabs WHERE status = 'approved' AND created_at >= ${startOfMonth.toISOString()}`
+            ]
+      );
 
       return {
         total: Number(total[0].count),
@@ -200,7 +232,10 @@ export class TabsDBExamples {
       const newTab = await TabsDB.createTab(
         "My First Harmonica Tab",
         "1 2 3 4 5",
-        "C D E F G"
+        "C D E F G",
+        "Beginner",
+        "C",
+        "Folk"
       );
       console.log('Created tab:', newTab);
       return newTab;

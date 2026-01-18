@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { TabsDB, initializeDatabase } from '../../../../../lib/db';
+import { initializeDatabase } from '../../../../../lib/db';
 import { AdvancedTabsDB } from '../../../../../lib/db-utils';
+import { isAuthenticated } from '../../../../../lib/auth';
 
 // GET /api/tabs/paginated?page=1&limit=10 - Get paginated tabs
 export async function GET(request: NextRequest) {
@@ -17,7 +18,8 @@ export async function GET(request: NextRequest) {
     
     await initializeDatabase();
     
-    const result = await AdvancedTabsDB.getTabsPaginated(page, limit);
+    const includeAll = isAuthenticated(request);
+    const result = await AdvancedTabsDB.getTabsPaginated(page, limit, includeAll);
     return NextResponse.json(result);
   } catch (error) {
     console.error('Error getting paginated tabs:', error);

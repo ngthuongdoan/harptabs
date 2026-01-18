@@ -218,7 +218,15 @@ export default function SavedTabsManagerDialog({
           }}
           holeHistory={selectedTab.holeHistory}
           noteHistory={selectedTab.noteHistory}
-          editingTab={{ id: selectedTab.id, title: selectedTab.title }}
+          harmonicaType={selectedTab.harmonicaType}
+          editingTab={{
+            id: selectedTab.id,
+            title: selectedTab.title,
+            difficulty: selectedTab.difficulty,
+            genre: selectedTab.genre,
+            key: selectedTab.key,
+            harmonicaType: selectedTab.harmonicaType
+          }}
         />
       )}
     </>

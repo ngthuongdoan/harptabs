@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -12,15 +12,31 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { SavedTabsManager } from '@/lib/saved-tabs';
 import { useToast } from '@/hooks/use-toast';
+import { type HarmonicaType } from '@/lib/harmonica';
 
 interface SaveTabDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   holeHistory: string;
   noteHistory: string;
-  editingTab?: { id: string; title: string } | null;
+  harmonicaType: HarmonicaType;
+  editingTab?: {
+    id: string;
+    title: string;
+    difficulty: 'Beginner' | 'Intermediate' | 'Advanced';
+    genre: string;
+    key: string;
+    harmonicaType: HarmonicaType;
+  } | null;
 }
 
 export default function SaveTabDialog({
@@ -28,17 +44,76 @@ export default function SaveTabDialog({
   onOpenChange,
   holeHistory,
   noteHistory,
+  harmonicaType,
   editingTab
 }: SaveTabDialogProps) {
   const [title, setTitle] = useState(editingTab?.title || '');
+  const [difficulty, setDifficulty] = useState<'Beginner' | 'Intermediate' | 'Advanced' | ''>(editingTab?.difficulty || '');
+  const [genre, setGenre] = useState(editingTab?.genre || '');
+  const [key, setKey] = useState(editingTab?.key || '');
+  const [selectedHarmonicaType, setSelectedHarmonicaType] = useState<HarmonicaType>(editingTab?.harmonicaType || harmonicaType);
   const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
+
+  useEffect(() => {
+    if (open) {
+      setTitle(editingTab?.title || '');
+      setDifficulty(editingTab?.difficulty || '');
+      setGenre(editingTab?.genre || '');
+      setKey(editingTab?.key || '');
+      setSelectedHarmonicaType(editingTab?.harmonicaType || harmonicaType);
+    }
+  }, [editingTab, harmonicaType, open]);
+
+  const isFormValid = Boolean(
+    title.trim()
+      && difficulty
+      && selectedHarmonicaType
+      && key.trim()
+      && genre.trim()
+  );
 
   const handleSave = async () => {
     if (!title.trim()) {
       toast({
         title: "Error",
         description: "Please enter a title for your tab.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!difficulty) {
+      toast({
+        title: "Error",
+        description: "Please select a difficulty level.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!selectedHarmonicaType) {
+      toast({
+        title: "Error",
+        description: "Please select a harmonica type.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!key.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter a key.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!genre.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter a genre.",
         variant: "destructive"
       });
       return;
@@ -58,9 +133,26 @@ export default function SaveTabDialog({
     try {
       let result;
       if (editingTab) {
-        result = await SavedTabsManager.updateTab(editingTab.id, title.trim(), holeHistory, noteHistory);
+        result = await SavedTabsManager.updateTab(
+          editingTab.id,
+          title.trim(),
+          holeHistory,
+          noteHistory,
+          selectedHarmonicaType,
+          difficulty,
+          key.trim(),
+          genre.trim()
+        );
       } else {
-        result = await SavedTabsManager.saveTab(title.trim(), holeHistory, noteHistory);
+        result = await SavedTabsManager.saveTab(
+          title.trim(),
+          holeHistory,
+          noteHistory,
+          selectedHarmonicaType,
+          difficulty,
+          key.trim(),
+          genre.trim()
+        );
       }
 
       if (result) {
@@ -70,6 +162,9 @@ export default function SaveTabDialog({
         });
         onOpenChange(false);
         setTitle('');
+        setDifficulty('');
+        setGenre('');
+        setKey('');
       } else {
         throw new Error('Save operation failed');
       }
@@ -83,9 +178,14 @@ export default function SaveTabDialog({
     } finally {
       setIsSaving(false);
     }
-  }; const handleClose = () => {
+  };
+
+  const handleClose = () => {
     if (!editingTab) {
       setTitle('');
+      setDifficulty('');
+      setGenre('');
+      setKey('');
     }
     onOpenChange(false);
   };
@@ -118,6 +218,59 @@ export default function SaveTabDialog({
               autoFocus
             />
           </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="difficulty" className="text-right">
+              Difficulty
+            </Label>
+            <Select value={difficulty} onValueChange={(value) => setDifficulty(value as 'Beginner' | 'Intermediate' | 'Advanced')}>
+              <SelectTrigger id="difficulty" className="col-span-3">
+                <SelectValue placeholder="Select difficulty" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Beginner">Beginner</SelectItem>
+                <SelectItem value="Intermediate">Intermediate</SelectItem>
+                <SelectItem value="Advanced">Advanced</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="harmonica-type" className="text-right">
+              Harmonica Type
+            </Label>
+            <Select value={selectedHarmonicaType} onValueChange={(value) => setSelectedHarmonicaType(value as HarmonicaType)}>
+              <SelectTrigger id="harmonica-type" className="col-span-3">
+                <SelectValue placeholder="Select harmonica type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="tremolo">Tremolo (24-hole)</SelectItem>
+                <SelectItem value="diatonic">Diatonic (10-hole)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="key" className="text-right">
+              Key
+            </Label>
+            <Input
+              id="key"
+              value={key}
+              onChange={(e) => setKey(e.target.value)}
+              placeholder="Enter key (e.g., C, Gm)"
+              className="col-span-3"
+            />
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="genre" className="text-right">
+              Genre
+            </Label>
+            <Input
+              id="genre"
+              value={genre}
+              onChange={(e) => setGenre(e.target.value)}
+              placeholder="Enter genre"
+              className="col-span-3"
+            />
+          </div>
           <div className="text-sm text-muted-foreground">
             <p>Preview:</p>
             <div className="mt-2 p-3 bg-muted rounded-md">
@@ -136,7 +289,7 @@ export default function SaveTabDialog({
           <Button variant="outline" onClick={handleClose} disabled={isSaving}>
             Cancel
           </Button>
-          <Button onClick={handleSave} disabled={isSaving}>
+          <Button onClick={handleSave} disabled={isSaving || !isFormValid}>
             {isSaving ? 'Saving...' : (editingTab ? 'Update' : 'Save')}
           </Button>
         </DialogFooter>

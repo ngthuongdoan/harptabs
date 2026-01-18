@@ -4,7 +4,11 @@ export interface SavedTab {
   holeHistory: string;
   noteHistory: string;
   harmonicaType: 'diatonic' | 'tremolo';
-  status: 'pending' | 'approved';
+  difficulty: 'Beginner' | 'Intermediate' | 'Advanced';
+  genre: string;
+  key: string;
+  status: 'draft' | 'pending' | 'approved' | 'rejected';
+  rejectionReason: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -25,7 +29,15 @@ export class SavedTabsManager {
   }
 
   // Save a new tab to the database
-  static async saveTab(title: string, holeHistory: string, noteHistory: string): Promise<SavedTab | null> {
+  static async saveTab(
+    title: string,
+    holeHistory: string,
+    noteHistory: string,
+    harmonicaType: 'diatonic' | 'tremolo',
+    difficulty: 'Beginner' | 'Intermediate' | 'Advanced',
+    key: string,
+    genre: string
+  ): Promise<SavedTab | null> {
     try {
       const response = await fetch('/api/tabs', {
         method: 'POST',
@@ -36,6 +48,10 @@ export class SavedTabsManager {
           title,
           holeHistory,
           noteHistory,
+          harmonicaType,
+          difficulty,
+          key,
+          genre,
         }),
       });
       
@@ -51,7 +67,16 @@ export class SavedTabsManager {
   }
 
   // Update an existing tab
-  static async updateTab(id: string, title: string, holeHistory: string, noteHistory: string): Promise<SavedTab | null> {
+  static async updateTab(
+    id: string,
+    title: string,
+    holeHistory: string,
+    noteHistory: string,
+    harmonicaType?: 'diatonic' | 'tremolo',
+    difficulty?: 'Beginner' | 'Intermediate' | 'Advanced',
+    key?: string,
+    genre?: string
+  ): Promise<SavedTab | null> {
     try {
       const response = await fetch(`/api/tabs/${id}`, {
         method: 'PUT',
@@ -62,6 +87,10 @@ export class SavedTabsManager {
           title,
           holeHistory,
           noteHistory,
+          harmonicaType,
+          difficulty,
+          key,
+          genre,
         }),
       });
       

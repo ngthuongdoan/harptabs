@@ -14,13 +14,14 @@ import {
 import { useAdmin } from '@/contexts/admin-context';
 import { useToast } from '@/hooks/use-toast';
 import { LogIn, LogOut } from 'lucide-react';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 export default function AdminLogin() {
   const { isAdmin, apiKey, setApiKey } = useAdmin();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [inputKey, setInputKey] = useState('');
   const { toast } = useToast();
-
+  const isMobile = useIsMobile();
   const handleLogin = async () => {
     if (!inputKey.trim()) {
       toast({
@@ -74,14 +75,14 @@ export default function AdminLogin() {
   return (
     <>
       {isAdmin ? (
-        <Button variant="outline" size="sm" onClick={handleLogout}>
-          <LogOut className="h-4 w-4 mr-2" />
-          Admin Logout
+        <Button variant="outline" size={isMobile ? "icon" : "default"} onClick={handleLogout}>
+          <LogOut className="h-4 w-4" />
+          <span className="hidden sm:inline">Admin Logout</span>
         </Button>
       ) : (
-        <Button variant="ghost" size="sm" onClick={() => setDialogOpen(true)}>
-          <LogIn className="h-4 w-4 mr-2" />
-          Admin Login
+          <Button variant="ghost" size={isMobile ? "icon" : "default"} onClick={() => setDialogOpen(true)}>
+            <LogIn className="h-4 w-4" />
+            <span className="hidden sm:inline">Admin Login</span>
         </Button>
       )}
 

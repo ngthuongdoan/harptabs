@@ -21,10 +21,26 @@ export async function GET(request: NextRequest) {
 // POST /api/tabs - Create new tab (pending approval)
 export async function POST(request: NextRequest) {
   try {
-    const { title, holeHistory, noteHistory } = await request.json();
+    const { title, holeHistory, noteHistory, harmonicaType, difficulty, key, genre } = await request.json();
     
     if (!title || typeof title !== 'string') {
       return NextResponse.json({ error: 'Title is required' }, { status: 400 });
+    }
+
+    if (!harmonicaType || (harmonicaType !== 'diatonic' && harmonicaType !== 'tremolo')) {
+      return NextResponse.json({ error: 'Harmonica type is required' }, { status: 400 });
+    }
+
+    if (!difficulty || !['Beginner', 'Intermediate', 'Advanced'].includes(difficulty)) {
+      return NextResponse.json({ error: 'Difficulty is required' }, { status: 400 });
+    }
+
+    if (!key || typeof key !== 'string' || !key.trim()) {
+      return NextResponse.json({ error: 'Key is required' }, { status: 400 });
+    }
+
+    if (!genre || typeof genre !== 'string' || !genre.trim()) {
+      return NextResponse.json({ error: 'Genre is required' }, { status: 400 });
     }
     
     // Ensure database is initialized
@@ -33,7 +49,11 @@ export async function POST(request: NextRequest) {
     const newTab = await TabsDB.createTab(
       title.trim(),
       holeHistory || '',
-      noteHistory || ''
+      noteHistory || '',
+      difficulty,
+      key.trim(),
+      genre.trim(),
+      harmonicaType
     );
     
     return NextResponse.json({ 

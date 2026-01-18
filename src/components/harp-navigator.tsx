@@ -7,7 +7,7 @@ import HarmonicaDiagram from './harmonica-diagram';
 import { getHarmonicaLayout, type Note, type HoleAction, type HarmonicaType, isDiatonicLayout, isTremoloLayout, convertDiatonicToTremolo, convertTremoloToDiatonic } from '@/lib/harmonica';
 import { Separator } from './ui/separator';
 import { Button } from './ui/button';
-import { CornerDownLeft, Trash2, Delete, Save, FolderOpen, ArrowRightLeft } from 'lucide-react';
+import { CornerDownLeft, Trash2, Delete, Save, FolderOpen, ArrowRightLeft, Clipboard, Undo2, Redo2 } from 'lucide-react';
 import SaveTabDialog from './save-tab-dialog';
 import SavedTabsManagerDialog from './saved-tabs-manager';
 import { useToast } from '@/hooks/use-toast';
@@ -20,13 +20,15 @@ import {
 } from "@/components/ui/select";
 
 export default function HarpNavigator() {
-  const [harmonicaType, setHarmonicaType] = useState<HarmonicaType>('diatonic');
+  const [harmonicaType, setHarmonicaType] = useState<HarmonicaType>('tremolo');
   const [selectedNote, setSelectedNote] = useState<Note | null>(null);
   const [selectedHoleInfo, setSelectedHoleInfo] = useState<{ hole: number; action: HoleAction } | null>(null);
   const [holeHistory, setHoleHistory] = useState<string>('');
   const [noteHistory, setNoteHistory] = useState<string>('');
+  const [undoStack, setUndoStack] = useState<Array<{ holeHistory: string; noteHistory: string; harmonicaType: HarmonicaType }>>([]);
+  const [redoStack, setRedoStack] = useState<Array<{ holeHistory: string; noteHistory: string; harmonicaType: HarmonicaType }>>([]);
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
-  const [savedTabsDialogOpen, setSavedTabsDialogOpen] = useState(false);
+  // const [savedTabsDialogOpen, setSavedTabsDialogOpen] = useState(false);
   const { toast } = useToast();
 
   const layout = useMemo(() => getHarmonicaLayout(harmonicaType), [harmonicaType]);
@@ -35,63 +37,57 @@ export default function HarpNavigator() {
   const noteScrollRef = useRef<HTMLDivElement>(null);
   const isSyncingScroll = useRef(false);
 
-  const addToHistory = useCallback((hole: string, note: string) => {
-    setHoleHistory(prev => {
-      if (!prev) return hole;
-      if (prev.endsWith('\n')) return prev + hole;
-      return prev + ' ' + hole;
-    });
-    setNoteHistory(prev => {
-      if (!prev) return note;
-      if (prev.endsWith('\n')) return prev + note;
-      return prev + ' ' + note;
-    });
+  const getCurrentState = useCallback(() => ({
+    holeHistory,
+    noteHistory,
+    harmonicaType
+  }), [holeHistory, noteHistory, harmonicaType]);
+
+  const applyState = useCallback((state: { holeHistory: string; noteHistory: string; harmonicaType: HarmonicaType }) => {
+    setHoleHistory(state.holeHistory);
+    setNoteHistory(state.noteHistory);
+    setHarmonicaType(state.harmonicaType);
   }, []);
+
+  const applyEdit = useCallback((nextState: { holeHistory: string; noteHistory: string; harmonicaType: HarmonicaType }) => {
+    setUndoStack(prev => [...prev, getCurrentState()]);
+    setRedoStack([]);
+    applyState(nextState);
+  }, [applyState, getCurrentState]);
+
+  const appendToken = (prev: string, token: string) => {
+    if (!prev) return token;
+    if (prev.endsWith('\n')) return prev + token;
+    return `${prev} ${token}`;
+  };
+
+  const removeLastEntry = (prev: string) => {
+    if (!prev) return prev;
+    if (prev.endsWith('\n')) {
+      return prev.slice(0, -1);
+    }
+    const lastSpaceIndex = prev.lastIndexOf(' ');
+    if (lastSpaceIndex === -1) {
+      return '';
+    }
+    return prev.slice(0, lastSpaceIndex);
+  };
 
   const handleNewLine = () => {
     if (holeHistory || noteHistory) {
-      setHoleHistory(prev => prev + '\n');
-      setNoteHistory(prev => prev + '\n');
+      applyEdit({
+        holeHistory: `${holeHistory}\n`,
+        noteHistory: `${noteHistory}\n`,
+        harmonicaType
+      });
     }
   };
 
   const handleBackspace = () => {
-    setHoleHistory(prev => {
-      if (!prev) return prev;
-
-      // If the string ends with a newline, remove it
-      if (prev.endsWith('\n')) {
-        return prev.slice(0, -1);
-      }
-
-      // Find the last space or start of string to remove the last entry
-      const lastSpaceIndex = prev.lastIndexOf(' ');
-      if (lastSpaceIndex === -1) {
-        // No spaces found, clear the string
-        return '';
-      } else {
-        // Remove everything after the last space
-        return prev.slice(0, lastSpaceIndex);
-      }
-    });
-
-    setNoteHistory(prev => {
-      if (!prev) return prev;
-
-      // If the string ends with a newline, remove it
-      if (prev.endsWith('\n')) {
-        return prev.slice(0, -1);
-      }
-
-      // Find the last space or start of string to remove the last entry
-      const lastSpaceIndex = prev.lastIndexOf(' ');
-      if (lastSpaceIndex === -1) {
-        // No spaces found, clear the string
-        return '';
-      } else {
-        // Remove everything after the last space
-        return prev.slice(0, lastSpaceIndex);
-      }
+    applyEdit({
+      holeHistory: removeLastEntry(holeHistory),
+      noteHistory: removeLastEntry(noteHistory),
+      harmonicaType
     });
   };
 
@@ -125,20 +121,27 @@ export default function HarpNavigator() {
     setSelectedHoleInfo({ hole, action });
     setSelectedNote(note || null);
     if (note) {
-      addToHistory(holeNotation, note);
+      applyEdit({
+        holeHistory: appendToken(holeHistory, holeNotation),
+        noteHistory: appendToken(noteHistory, note),
+        harmonicaType
+      });
     }
 
     // Reset the flag after a short delay
     setTimeout(() => {
       processingRef.current = false;
     }, 50);
-  }, [layout, addToHistory]);
+  }, [layout, applyEdit, holeHistory, noteHistory, harmonicaType]);
 
 
 
   const handleClearHistory = () => {
-    setHoleHistory('');
-    setNoteHistory('');
+    applyEdit({
+      holeHistory: '',
+      noteHistory: '',
+      harmonicaType
+    });
   };
 
   const handleConvertTab = () => {
@@ -157,8 +160,11 @@ export default function HarpNavigator() {
       : convertTremoloToDiatonic(holeHistory);
 
     if (result.success || result.convertedTab) {
-      setHoleHistory(result.convertedTab);
-      setHarmonicaType(targetType);
+      applyEdit({
+        holeHistory: result.convertedTab,
+        noteHistory,
+        harmonicaType: targetType
+      });
       
       toast({
         title: "Tab converted!",
@@ -181,9 +187,157 @@ export default function HarpNavigator() {
     }
   };
 
+  const handlePaste = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (!text.trim()) {
+        toast({
+          title: "Nothing to paste",
+          description: "Clipboard is empty.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Clean the text: split by lines, process each line
+      const cleanedLines = text.split('\n')
+        .map(line => {
+          // Keep only valid characters: digits, +/-, note letters (A-G), #, b, ♯, ♭, and spaces
+          return line.replace(/[^0-9+\-A-Ga-g#b♯♭\s]/g, '').trim();
+        })
+        .filter(line => line.length > 0); // Remove empty lines
+
+      if (cleanedLines.length === 0) {
+        toast({
+          title: "Nothing to paste",
+          description: "No valid content found after cleaning.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      const cleanedText = cleanedLines.join('\n');
+
+      // Detect if pasted content is hole notation or note letters
+      const hasHoleNotation = /[\+\-]?\d+/.test(cleanedText);
+      const hasNoteLetters = /[A-Ga-g][#b♯♭]?/.test(cleanedText);
+
+      if (hasHoleNotation && !hasNoteLetters) {
+        // It's hole notation - convert to notes
+        const convertedNotes = convertHoleToNotes(cleanedText);
+        applyEdit({
+          holeHistory: cleanedText,
+          noteHistory: convertedNotes,
+          harmonicaType
+        });
+        toast({
+          title: "Tab pasted!",
+          description: "Hole notation pasted and converted to notes.",
+        });
+      } else if (hasNoteLetters && !hasHoleNotation) {
+        // It's note notation - paste to note history
+        applyEdit({
+          holeHistory: '',
+          noteHistory: cleanedText,
+          harmonicaType
+        });
+        toast({
+          title: "Notes pasted!",
+          description: "Note letters pasted successfully.",
+        });
+      } else if (hasHoleNotation && hasNoteLetters) {
+        // Mixed content - try to parse both
+        applyEdit({
+          holeHistory: cleanedText,
+          noteHistory: cleanedText,
+          harmonicaType
+        });
+        toast({
+          title: "Content pasted!",
+          description: "Mixed content detected. Please review and adjust as needed.",
+        });
+      } else {
+        toast({
+          title: "Unrecognized format",
+          description: "The pasted content doesn't appear to be a valid tab.",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Paste failed",
+        description: "Unable to access clipboard. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const convertHoleToNotes = (holeText: string): string => {
+    const lines = holeText.split('\n');
+    const noteLines = lines.map(line => {
+      const tokens = line.split(/\s+/);
+      const notes = tokens.map(token => {
+        if (!token) return '';
+
+        // Parse hole notation
+        let hole: number;
+        let action: HoleAction = 'blow';
+
+        if (token.startsWith('+')) {
+          hole = parseInt(token.substring(1));
+          action = 'blow';
+        } else if (token.startsWith('-')) {
+          hole = parseInt(token.substring(1));
+          action = 'draw';
+        } else {
+          hole = parseInt(token);
+          // For tremolo, there's only one action (note)
+          action = 'blow';
+        }
+
+        if (isNaN(hole)) return token;
+
+        // Get note from layout
+        let note: Note | null = null;
+        if (isDiatonicLayout(layout)) {
+          note = layout[hole]?.[action];
+        } else if (isTremoloLayout(layout)) {
+          note = layout[hole]?.note;
+        }
+
+        return note || token;
+      });
+      return notes.join(' ');
+    });
+    return noteLines.join('\n');
+  };
+
   const handleLoadTab = (holeHistory: string, noteHistory: string) => {
-    setHoleHistory(holeHistory);
-    setNoteHistory(noteHistory);
+    applyEdit({
+      holeHistory,
+      noteHistory,
+      harmonicaType
+    });
+  };
+
+  const handleUndo = () => {
+    setUndoStack(prev => {
+      if (prev.length === 0) return prev;
+      const previousState = prev[prev.length - 1];
+      setRedoStack(next => [...next, getCurrentState()]);
+      applyState(previousState);
+      return prev.slice(0, -1);
+    });
+  };
+
+  const handleRedo = () => {
+    setRedoStack(prev => {
+      if (prev.length === 0) return prev;
+      const nextState = prev[prev.length - 1];
+      setUndoStack(next => [...next, getCurrentState()]);
+      applyState(nextState);
+      return prev.slice(0, -1);
+    });
   };
 
   const handleHoleScroll = (e: React.UIEvent<HTMLDivElement>) => {
@@ -226,7 +380,11 @@ export default function HarpNavigator() {
           <div className="flex items-center gap-3">
             <label htmlFor="harmonica-type" className="text-sm font-medium">Harmonica Type:</label>
             <Select value={harmonicaType} onValueChange={(value: HarmonicaType) => {
-              setHarmonicaType(value);
+              applyEdit({
+                holeHistory,
+                noteHistory,
+                harmonicaType: value
+              });
               setSelectedHoleInfo(null);
               setSelectedNote(null);
             }}>
@@ -234,8 +392,8 @@ export default function HarpNavigator() {
                 <SelectValue placeholder="Select type" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="diatonic">Diatonic (10-hole)</SelectItem>
                 <SelectItem value="tremolo">Tremolo (24-hole)</SelectItem>
+                <SelectItem value="diatonic">Diatonic (10-hole)</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -254,9 +412,13 @@ export default function HarpNavigator() {
             <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-2 gap-3">
               <CardTitle className="text-lg font-medium">Tab History</CardTitle>
               <div className="flex flex-wrap gap-2">
-                <Button variant="outline" size="sm" onClick={() => setSavedTabsDialogOpen(true)} className="flex-1 sm:flex-none">
+                {/* <Button variant="outline" size="sm" onClick={() => setSavedTabsDialogOpen(true)} className="flex-1 sm:flex-none">
                   <FolderOpen className="h-4 w-4 sm:mr-2" />
                   <span className="hidden sm:inline">Saved Tabs</span>
+                </Button> */}
+                <Button variant="outline" size="sm" onClick={handlePaste} className="flex-1 sm:flex-none">
+                  <Clipboard className="h-4 w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Paste</span>
                 </Button>
                 <Button variant="outline" size="sm" onClick={() => setSaveDialogOpen(true)} disabled={!holeHistory && !noteHistory} className="flex-1 sm:flex-none">
                   <Save className="h-4 w-4 sm:mr-2" />
@@ -265,6 +427,14 @@ export default function HarpNavigator() {
                 <Button variant="outline" size="sm" onClick={handleConvertTab} disabled={!holeHistory} className="flex-1 sm:flex-none">
                   <ArrowRightLeft className="h-4 w-4 sm:mr-2" />
                   <span className="hidden sm:inline">Convert</span>
+                </Button>
+                <Button variant="outline" size="sm" onClick={handleUndo} disabled={undoStack.length === 0} className="flex-1 sm:flex-none">
+                  <Undo2 className="h-4 w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Undo</span>
+                </Button>
+                <Button variant="outline" size="sm" onClick={handleRedo} disabled={redoStack.length === 0} className="flex-1 sm:flex-none">
+                  <Redo2 className="h-4 w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Redo</span>
                 </Button>
                 <Button variant="outline" size="sm" onClick={handleNewLine} disabled={!holeHistory && !noteHistory} className="flex-1 sm:flex-none">
                   <CornerDownLeft className="h-4 w-4 sm:mr-2" />
@@ -342,13 +512,14 @@ export default function HarpNavigator() {
         onOpenChange={setSaveDialogOpen}
         holeHistory={holeHistory}
         noteHistory={noteHistory}
+        harmonicaType={harmonicaType}
       />
-
+      {/*
       <SavedTabsManagerDialog
         open={savedTabsDialogOpen}
         onOpenChange={setSavedTabsDialogOpen}
         onLoadTab={handleLoadTab}
-      />
+      /> */}
     </Card>
   );
 }

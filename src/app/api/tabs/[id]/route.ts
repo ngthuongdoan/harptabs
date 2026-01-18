@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { TabsDB, initializeDatabase, type SavedTab } from '../../../../../lib/db';
+import { TabsDB, initializeDatabase } from '../../../../../lib/db';
 import { isAuthenticated, unauthorizedResponse } from '../../../../../lib/auth';
 
 interface RouteParams {
@@ -14,7 +14,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const { id } = await params;
     await initializeDatabase();
     
-    const tab = await TabsDB.getTab(id);
+    const includeAll = isAuthenticated(request);
+    const tab = await TabsDB.getTab(id, includeAll);
     if (!tab) {
       return NextResponse.json({ error: 'Tab not found' }, { status: 404 });
     }
@@ -35,7 +36,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
   
   try {
     const { id } = await params;
-    const { title, holeHistory, noteHistory } = await request.json();
+    const { title, holeHistory, noteHistory, harmonicaType, difficulty, key, genre } = await request.json();
     
     if (!title || typeof title !== 'string') {
       return NextResponse.json({ error: 'Title is required' }, { status: 400 });
@@ -47,7 +48,11 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       id,
       title.trim(),
       holeHistory || '',
-      noteHistory || ''
+      noteHistory || '',
+      harmonicaType,
+      difficulty ?? null,
+      typeof key === 'string' ? key.trim() : null,
+      typeof genre === 'string' ? genre.trim() : null
     );
     
     if (!updatedTab) {

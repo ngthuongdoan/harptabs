@@ -2,13 +2,20 @@ import { neon } from "@neondatabase/serverless";
 
 const sql = neon(process.env.DATABASE_URL!);
 
+export type TabStatus = 'draft' | 'pending' | 'approved' | 'rejected';
+
 export interface SavedTab {
   id: string;
   title: string;
   holeHistory: string;
   noteHistory: string;
   harmonicaType: 'diatonic' | 'tremolo';
-  status: 'pending' | 'approved';
+  difficulty: 'Beginner' | 'Intermediate' | 'Advanced';
+  genre: string;
+  key: string;
+  status: TabStatus;
+  rejectionReason: string | null;
+  viewCount: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -47,6 +54,11 @@ export async function initializeDatabase() {
         title VARCHAR(500) NOT NULL,
         hole_history TEXT DEFAULT '',
         note_history TEXT DEFAULT '',
+        harmonica_type VARCHAR(20) DEFAULT 'diatonic',
+        difficulty VARCHAR(50) DEFAULT 'Beginner',
+        genre VARCHAR(100) DEFAULT '',
+        music_key VARCHAR(50) DEFAULT '',
+        rejection_reason TEXT,
         status VARCHAR(20) DEFAULT 'pending',
         created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -63,6 +75,40 @@ export async function initializeDatabase() {
     await sql`
       ALTER TABLE harmonica_tabs 
       ADD COLUMN IF NOT EXISTS harmonica_type VARCHAR(20) DEFAULT 'diatonic'
+    `;
+
+    await sql`
+      ALTER TABLE harmonica_tabs 
+      ADD COLUMN IF NOT EXISTS difficulty VARCHAR(50) DEFAULT 'Beginner'
+    `;
+
+    await sql`
+      ALTER TABLE harmonica_tabs 
+      ADD COLUMN IF NOT EXISTS genre VARCHAR(100) DEFAULT ''
+    `;
+
+    await sql`
+      ALTER TABLE harmonica_tabs 
+      ADD COLUMN IF NOT EXISTS music_key VARCHAR(50) DEFAULT ''
+    `;
+
+    await sql`
+      ALTER TABLE harmonica_tabs 
+      ADD COLUMN IF NOT EXISTS rejection_reason TEXT
+    `;
+
+    await sql`
+      ALTER TABLE harmonica_tabs 
+      ADD COLUMN IF NOT EXISTS view_count INTEGER DEFAULT 0
+    `;
+
+    await sql`      ALTER TABLE harmonica_tabs 
+      ADD COLUMN IF NOT EXISTS view_count INTEGER DEFAULT 0
+    `;
+
+    await sql`      UPDATE harmonica_tabs
+      SET difficulty = 'Beginner'
+      WHERE difficulty IS NULL OR difficulty = ''
     `;
     
     // Approve all existing tabs (one-time migration)
@@ -108,13 +154,17 @@ export class TabsDB {
       const data = includeAll
         ? await sql`
             SELECT id, title, hole_history as "holeHistory", note_history as "noteHistory", 
-                   harmonica_type as "harmonicaType", status, created_at as "createdAt", updated_at as "updatedAt"
+                   harmonica_type as "harmonicaType", difficulty, genre, music_key as "key",
+                   rejection_reason as "rejectionReason",
+                   status, view_count as "viewCount", created_at as "createdAt", updated_at as "updatedAt"
             FROM harmonica_tabs 
             ORDER BY updated_at DESC
           `
         : await sql`
             SELECT id, title, hole_history as "holeHistory", note_history as "noteHistory", 
-                   harmonica_type as "harmonicaType", status, created_at as "createdAt", updated_at as "updatedAt"
+                   harmonica_type as "harmonicaType", difficulty, genre, music_key as "key",
+                   rejection_reason as "rejectionReason",
+                   status, view_count as "viewCount", created_at as "createdAt", updated_at as "updatedAt"
             FROM harmonica_tabs 
             WHERE status = 'approved'
             ORDER BY updated_at DESC
@@ -131,13 +181,17 @@ export class TabsDB {
       const data = includeAll
         ? await sql`
             SELECT id, title, hole_history as "holeHistory", note_history as "noteHistory", 
-                   harmonica_type as "harmonicaType", status, created_at as "createdAt", updated_at as "updatedAt"
+                   harmonica_type as "harmonicaType", difficulty, genre, music_key as "key",
+                   rejection_reason as "rejectionReason",
+                   status, view_count as "viewCount", created_at as "createdAt", updated_at as "updatedAt"
             FROM harmonica_tabs 
             WHERE id = ${id}
           `
         : await sql`
             SELECT id, title, hole_history as "holeHistory", note_history as "noteHistory", 
-                   harmonica_type as "harmonicaType", status, created_at as "createdAt", updated_at as "updatedAt"
+                   harmonica_type as "harmonicaType", difficulty, genre, music_key as "key",
+                   rejection_reason as "rejectionReason",
+                   status, view_count as "viewCount", created_at as "createdAt", updated_at as "updatedAt"
             FROM harmonica_tabs 
             WHERE id = ${id} AND status = 'approved'
           `;
@@ -148,17 +202,32 @@ export class TabsDB {
     }
   }
 
-  static async createTab(title: string, holeHistory: string, noteHistory: string): Promise<SavedTab> {
+  static async createTab(
+    title: string,
+    holeHistory: string,
+    noteHistory: string,
+    difficulty: 'Beginner' | 'Intermediate' | 'Advanced',
+    key: string,
+    genre: string,
+    harmonicaType?: 'diatonic' | 'tremolo'
+  ): Promise<SavedTab> {
     try {
       const now = new Date();
       const id = `tab-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-      const harmonicaType = detectHarmonicaType(holeHistory);
+      const finalHarmonicaType = harmonicaType || detectHarmonicaType(holeHistory);
       
       const data = await sql`
-        INSERT INTO harmonica_tabs (id, title, hole_history, note_history, harmonica_type, status, created_at, updated_at)
-        VALUES (${id}, ${title}, ${holeHistory}, ${noteHistory}, ${harmonicaType}, 'pending', ${now.toISOString()}, ${now.toISOString()})
+        INSERT INTO harmonica_tabs (
+          id, title, hole_history, note_history, harmonica_type, difficulty, genre, music_key, status, created_at, updated_at
+        )
+        VALUES (
+          ${id}, ${title}, ${holeHistory}, ${noteHistory}, ${finalHarmonicaType}, ${difficulty}, ${genre}, ${key},
+          'pending', ${now.toISOString()}, ${now.toISOString()}
+        )
         RETURNING id, title, hole_history as "holeHistory", note_history as "noteHistory", 
-                  harmonica_type as "harmonicaType", status, created_at as "createdAt", updated_at as "updatedAt"
+                  harmonica_type as "harmonicaType", difficulty, genre, music_key as "key",
+                  rejection_reason as "rejectionReason",
+                  status, view_count as "viewCount", created_at as "createdAt", updated_at as "updatedAt"
       `;
       return data[0] as SavedTab;
     } catch (error) {
@@ -167,18 +236,33 @@ export class TabsDB {
     }
   }
 
-  static async updateTab(id: string, title: string, holeHistory: string, noteHistory: string): Promise<SavedTab | null> {
+  static async updateTab(
+    id: string,
+    title: string,
+    holeHistory: string,
+    noteHistory: string,
+    harmonicaType?: 'diatonic' | 'tremolo',
+    difficulty?: 'Beginner' | 'Intermediate' | 'Advanced' | null,
+    key?: string | null,
+    genre?: string | null
+  ): Promise<SavedTab | null> {
     try {
       const now = new Date();
-      const harmonicaType = detectHarmonicaType(holeHistory);
+      const finalHarmonicaType = harmonicaType || detectHarmonicaType(holeHistory);
       
       const data = await sql`
         UPDATE harmonica_tabs 
         SET title = ${title}, hole_history = ${holeHistory}, note_history = ${noteHistory}, 
-            harmonica_type = ${harmonicaType}, updated_at = ${now.toISOString()}
+            harmonica_type = ${finalHarmonicaType},
+            difficulty = COALESCE(${difficulty}, difficulty),
+            genre = COALESCE(${genre}, genre),
+            music_key = COALESCE(${key}, music_key),
+            updated_at = ${now.toISOString()}
         WHERE id = ${id}
         RETURNING id, title, hole_history as "holeHistory", note_history as "noteHistory", 
-                  harmonica_type as "harmonicaType", status, created_at as "createdAt", updated_at as "updatedAt"
+                  harmonica_type as "harmonicaType", difficulty, genre, music_key as "key",
+                  rejection_reason as "rejectionReason",
+                  status, view_count as "viewCount", created_at as "createdAt", updated_at as "updatedAt"
       `;
       return data[0] as SavedTab || null;
     } catch (error) {
@@ -188,18 +272,43 @@ export class TabsDB {
   }
   static async approveTab(id: string): Promise<SavedTab | null> {
     try {
+      return await TabsDB.updateTabStatus(id, 'approved');
+    } catch (error) {
+      console.error('Error approving tab:', error);
+      throw error;
+    }
+  }
+
+  static async rejectTab(id: string, rejectionReason: string | null): Promise<SavedTab | null> {
+    try {
+      return await TabsDB.updateTabStatus(id, 'rejected', rejectionReason);
+    } catch (error) {
+      console.error('Error rejecting tab:', error);
+      throw error;
+    }
+  }
+
+  static async updateTabStatus(
+    id: string,
+    status: TabStatus,
+    rejectionReason?: string | null
+  ): Promise<SavedTab | null> {
+    try {
       const now = new Date();
-      
+      const finalRejectionReason = status === 'rejected' ? (rejectionReason ?? null) : null;
+
       const data = await sql`
         UPDATE harmonica_tabs 
-        SET status = 'approved', updated_at = ${now.toISOString()}
+        SET status = ${status}, rejection_reason = ${finalRejectionReason}, updated_at = ${now.toISOString()}
         WHERE id = ${id}
         RETURNING id, title, hole_history as "holeHistory", note_history as "noteHistory", 
-                  harmonica_type as "harmonicaType", status, created_at as "createdAt", updated_at as "updatedAt"
+                  harmonica_type as "harmonicaType", difficulty, genre, music_key as "key",
+                  rejection_reason as "rejectionReason",
+                  status, view_count as "viewCount", created_at as "createdAt", updated_at as "updatedAt"
       `;
       return data[0] as SavedTab || null;
     } catch (error) {
-      console.error('Error approving tab:', error);
+      console.error('Error updating tab status:', error);
       throw error;
     }
   }
@@ -208,7 +317,9 @@ export class TabsDB {
     try {
       const data = await sql`
         SELECT id, title, hole_history as "holeHistory", note_history as "noteHistory", 
-               harmonica_type as "harmonicaType", status, created_at as "createdAt", updated_at as "updatedAt"
+               harmonica_type as "harmonicaType", difficulty, genre, music_key as "key",
+               rejection_reason as "rejectionReason",
+               status, view_count as "viewCount", created_at as "createdAt", updated_at as "updatedAt"
         FROM harmonica_tabs 
         WHERE status = 'pending'
         ORDER BY created_at DESC
@@ -239,14 +350,18 @@ export class TabsDB {
       const data = includeAll
         ? await sql`
             SELECT id, title, hole_history as "holeHistory", note_history as "noteHistory", 
-                   harmonica_type as "harmonicaType", status, created_at as "createdAt", updated_at as "updatedAt"
+                   harmonica_type as "harmonicaType", difficulty, genre, music_key as "key",
+                   rejection_reason as "rejectionReason",
+                   status, view_count as "viewCount", created_at as "createdAt", updated_at as "updatedAt"
             FROM harmonica_tabs 
             WHERE title ILIKE ${`%${titlePattern}%`}
             ORDER BY updated_at DESC
           `
         : await sql`
             SELECT id, title, hole_history as "holeHistory", note_history as "noteHistory", 
-                   harmonica_type as "harmonicaType", status, created_at as "createdAt", updated_at as "updatedAt"
+                   harmonica_type as "harmonicaType", difficulty, genre, music_key as "key",
+                   rejection_reason as "rejectionReason",
+                   status, view_count as "viewCount", created_at as "createdAt", updated_at as "updatedAt"
             FROM harmonica_tabs 
             WHERE title ILIKE ${`%${titlePattern}%`} AND status = 'approved'
             ORDER BY updated_at DESC
@@ -275,14 +390,18 @@ export class TabsDB {
       const data = includeAll
         ? await sql`
             SELECT id, title, hole_history as "holeHistory", note_history as "noteHistory", 
-                   harmonica_type as "harmonicaType", status, created_at as "createdAt", updated_at as "updatedAt"
+                   harmonica_type as "harmonicaType", difficulty, genre, music_key as "key",
+                   rejection_reason as "rejectionReason",
+                   status, view_count as "viewCount", created_at as "createdAt", updated_at as "updatedAt"
             FROM harmonica_tabs 
             ORDER BY updated_at DESC
             LIMIT ${limit}
           `
         : await sql`
             SELECT id, title, hole_history as "holeHistory", note_history as "noteHistory", 
-                   harmonica_type as "harmonicaType", status, created_at as "createdAt", updated_at as "updatedAt"
+                   harmonica_type as "harmonicaType", difficulty, genre, music_key as "key",
+                   rejection_reason as "rejectionReason",
+                   status, view_count as "viewCount", created_at as "createdAt", updated_at as "updatedAt"
             FROM harmonica_tabs 
             WHERE status = 'approved'
             ORDER BY updated_at DESC
@@ -303,6 +422,24 @@ export class TabsDB {
       return data.length;
     } catch (error) {
       console.error('Error deleting all tabs:', error);
+      throw error;
+    }
+  }
+
+  static async incrementViewCount(id: string): Promise<SavedTab | null> {
+    try {
+      const data = await sql`
+        UPDATE harmonica_tabs 
+        SET view_count = COALESCE(view_count, 0) + 1
+        WHERE id = ${id} AND status = 'approved'
+        RETURNING id, title, hole_history as "holeHistory", note_history as "noteHistory", 
+                  harmonica_type as "harmonicaType", difficulty, genre, music_key as "key",
+                  rejection_reason as "rejectionReason",
+                  status, view_count as "viewCount", created_at as "createdAt", updated_at as "updatedAt"
+      `;
+      return data[0] as SavedTab || null;
+    } catch (error) {
+      console.error('Error incrementing view count:', error);
       throw error;
     }
   }

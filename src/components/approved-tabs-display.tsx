@@ -1,19 +1,45 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from '@/hooks/use-toast';
-import { Calendar, Eye } from 'lucide-react';
+import { useTabViewTracking } from '@/hooks/use-tab-view-tracking';
+import { Eye, Pencil } from 'lucide-react';
+import { TabCard, TabTypeBadge } from '@/components/tab-card';
+import { TabContentView } from '@/components/tab-content-view';
+import { formatDateShort } from '@/lib/tab-utils';
 import type { SavedTab } from '../../lib/db';
+import { convertDiatonicToTremolo, convertTremoloToDiatonic, type HarmonicaType } from '@/lib/harmonica';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
-export default function ApprovedTabsDisplay() {
+interface ApprovedTabsDisplayProps {
+  apiKey?: string | null;
+}
+
+export default function ApprovedTabsDisplay({ apiKey }: ApprovedTabsDisplayProps) {
   const [tabs, setTabs] = useState<SavedTab[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedTab, setSelectedTab] = useState<SavedTab | null>(null);
+  const [viewHarmonicaType, setViewHarmonicaType] = useState<HarmonicaType | null>(null);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editTitle, setEditTitle] = useState('');
+  const [editHoleHistory, setEditHoleHistory] = useState('');
+  const [editNoteHistory, setEditNoteHistory] = useState('');
+  const [editHarmonicaType, setEditHarmonicaType] = useState<HarmonicaType>('tremolo');
+  const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
+  const { trackView } = useTabViewTracking();
 
   useEffect(() => {
     loadApprovedTabs();
@@ -36,18 +62,117 @@ export default function ApprovedTabsDisplay() {
     }
   };
 
-  const formatDate = (timestamp: Date | string | number) => {
-    const date = new Date(timestamp);
-    return date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    });
+  const handleViewTab = async (tab: SavedTab) => {
+    setSelectedTab(tab);
+    setViewHarmonicaType(tab.harmonicaType);
+
+    // Track view - updates database and session storage
+    const tracked = await trackView(tab.id);
+
+    // Update local state to reflect new view count
+    if (tracked) {
+      setTabs(prevTabs =>
+        prevTabs.map(t =>
+          t.id === tab.id
+            ? { ...t, viewCount: t.viewCount + 1 }
+            : t
+        )
+      );
+    }
   };
 
-  const handleViewTab = (tab: SavedTab) => {
-    setSelectedTab(tab);
+  const openEditDialog = (tab: SavedTab) => {
+    setEditTitle(tab.title);
+    setEditHoleHistory(tab.holeHistory);
+    setEditNoteHistory(tab.noteHistory);
+    setEditHarmonicaType(tab.harmonicaType);
+    setEditDialogOpen(true);
   };
+
+  const getTabDisplayData = (tab: SavedTab, targetType: HarmonicaType) => {
+    if (targetType === tab.harmonicaType) {
+      return {
+        holeHistory: tab.holeHistory,
+        errors: [] as string[],
+        warnings: [] as string[],
+        isConverted: false,
+        usedFallback: false,
+      };
+    }
+
+    const result = tab.harmonicaType === 'diatonic'
+      ? convertDiatonicToTremolo(tab.holeHistory)
+      : convertTremoloToDiatonic(tab.holeHistory);
+
+    const hasConvertedTab = Boolean(result.convertedTab);
+    return {
+      holeHistory: hasConvertedTab ? result.convertedTab : tab.holeHistory,
+      errors: result.errors,
+      warnings: result.warnings,
+      isConverted: true,
+      usedFallback: !hasConvertedTab,
+    };
+  };
+
+  const handleSaveEdit = async () => {
+    if (!selectedTab) return;
+    if (!apiKey) {
+      toast({
+        title: "Error",
+        description: "Admin access required to edit tabs.",
+        variant: "destructive"
+      });
+      return;
+    }
+    if (!editTitle.trim()) {
+      toast({
+        title: "Error",
+        description: "Title is required.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const response = await fetch(`/api/tabs/${selectedTab.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey
+        },
+        body: JSON.stringify({
+          title: editTitle.trim(),
+          holeHistory: editHoleHistory,
+          noteHistory: editNoteHistory,
+          harmonicaType: editHarmonicaType
+        })
+      });
+
+      if (!response.ok) throw new Error('Failed to update tab');
+      const updatedTab = await response.json();
+      setTabs((prevTabs) => prevTabs.map((tab) => (tab.id === updatedTab.id ? updatedTab : tab)));
+      setSelectedTab(updatedTab);
+      setEditDialogOpen(false);
+      toast({
+        title: "Success",
+        description: "Tab updated successfully!"
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update tab.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const activeViewType = selectedTab ? (viewHarmonicaType ?? selectedTab.harmonicaType) : null;
+  const displayData = selectedTab && activeViewType
+    ? getTabDisplayData(selectedTab, activeViewType)
+    : null;
 
   if (loading) {
     return (
@@ -70,94 +195,173 @@ export default function ApprovedTabsDisplay() {
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {tabs.map((tab) => (
-          <Card
-            key={tab.id}
-            className="hover:shadow-lg transition-shadow cursor-pointer"
-            onClick={() => handleViewTab(tab)}
-          >
-            <CardHeader>
-              <div className="flex items-start justify-between">
-                <CardTitle className="text-lg line-clamp-2">{tab.title}</CardTitle>
-                <div className="flex gap-2">
-                  <Badge variant="secondary">Approved</Badge>
-                  <Badge variant="outline" className={tab.harmonicaType === 'tremolo' ? 'bg-purple-100 dark:bg-purple-950' : 'bg-blue-100 dark:bg-blue-950'}>
-                    {tab.harmonicaType === 'tremolo' ? 'Tremolo' : 'Diatonic'}
-                  </Badge>
-                </div>
-              </div>
-              <CardDescription className="flex items-center gap-2 text-xs">
-                <Calendar className="h-3 w-3" />
-                {formatDate(tab.createdAt)}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <div>
-                  <p className="text-xs font-semibold text-muted-foreground mb-1">Preview:</p>
-                  <ScrollArea className="h-20">
-                    <pre className="text-xs font-mono bg-background/50 p-2 rounded">
-                      {tab.holeHistory.split('\n')[0] || 'No content'}
-                    </pre>
-                  </ScrollArea>
-                </div>
-                <Button variant="outline" size="sm" className="w-full">
-                  <Eye className="h-4 w-4 mr-2" />
-                  View Full Tab
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+          <div key={tab.id} className="space-y-2">
+            <TabCard
+              tab={tab}
+              dateFormatter={formatDateShort}
+              additionalBadges={
+                <Badge variant="secondary">Approved</Badge>
+              }
+              previewMode={true}
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full"
+              onClick={() => handleViewTab(tab)}
+            >
+              <Eye className="h-4 w-4 mr-2" />
+              View Full Tab
+            </Button>
+          </div>
         ))}
       </div>
 
-      {selectedTab && (
-        <Card className="mt-6">
-          <CardHeader>
-            <div className="flex items-start justify-between">
-              <div>
-                <CardTitle>{selectedTab.title}</CardTitle>
-                <CardDescription>
-                  Created on {formatDate(selectedTab.createdAt)}
-                </CardDescription>
+      <Dialog open={!!selectedTab} onOpenChange={(open) => !open && setSelectedTab(null)}>
+        <DialogContent className="max-w-full h-full md:max-w-4xl md:h-[90vh] flex flex-col">
+          {selectedTab && (
+            <>
+              <DialogHeader>
+                <div className="flex items-start justify-between">
+                  <div>
+                    <DialogTitle className="text-2xl">{selectedTab.title}</DialogTitle>
+                    <DialogDescription>
+                      Created on {formatDateShort(selectedTab.createdAt)}
+                    </DialogDescription>
+                  </div>
+                  <TabTypeBadge type={selectedTab.harmonicaType} />
+                </div>
+              </DialogHeader>
+              <div className="flex-1 overflow-auto">
+                {selectedTab && displayData && (
+                  <>
+                    <div className="flex flex-col gap-2 mb-4">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-sm text-muted-foreground">View as:</span>
+                        <Button
+                          variant={activeViewType === 'diatonic' ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => setViewHarmonicaType('diatonic')}
+                        >
+                          Diatonic
+                        </Button>
+                        <Button
+                          variant={activeViewType === 'tremolo' ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => setViewHarmonicaType('tremolo')}
+                        >
+                          Tremolo
+                        </Button>
+                        {activeViewType !== selectedTab.harmonicaType && (
+                          <Badge variant="secondary">Converted</Badge>
+                        )}
+                      </div>
+                      {displayData.isConverted && (displayData.errors.length > 0 || displayData.warnings.length > 0) && (
+                        <p className="text-xs text-muted-foreground">
+                          {displayData.usedFallback && 'Conversion failed; showing original tab. '}
+                          {displayData.errors.length > 0 && `Errors: ${displayData.errors.join('; ')}. `}
+                          {displayData.warnings.length > 0 && `Warnings: ${displayData.warnings.join('; ')}.`}
+                        </p>
+                      )}
+                    </div>
+
+                    <TabContentView
+                      holeHistory={displayData.holeHistory}
+                      noteHistory={selectedTab.noteHistory}
+                      height="h-96"
+                    />
+                  </>
+                )}
               </div>
-              <Badge variant="outline" className={selectedTab.harmonicaType === 'tremolo' ? 'bg-purple-100 dark:bg-purple-950' : 'bg-blue-100 dark:bg-blue-950'}>
-                {selectedTab.harmonicaType === 'tremolo' ? '24-Hole Tremolo' : '10-Hole Diatonic'}
-              </Badge>
+              <DialogFooter className="flex-shrink-0 gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setSelectedTab(null)}
+                >
+                  Close
+                </Button>
+                {apiKey && (
+                  <Button
+                    variant="default"
+                    onClick={() => openEditDialog(selectedTab)}
+                  >
+                    <Pencil className="mr-2 h-4 w-4" />
+                    Edit Tab
+                  </Button>
+                )}
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Edit Approved Tab</DialogTitle>
+            <DialogDescription>
+              Update the title or contents to correct the public tab.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="tab-title" className="text-right">
+                Title
+              </Label>
+              <Input
+                id="tab-title"
+                value={editTitle}
+                onChange={(event) => setEditTitle(event.target.value)}
+                className="col-span-3"
+              />
             </div>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <h3 className="font-semibold text-sm uppercase text-muted-foreground tracking-wider mb-2">
-                  Hole Numbers
-                </h3>
-                <ScrollArea className="h-64">
-                  <pre className="p-4 bg-background/50 rounded-lg text-base font-mono whitespace-pre-wrap">
-                    {selectedTab.holeHistory}
-                  </pre>
-                </ScrollArea>
-              </div>
-              <div>
-                <h3 className="font-semibold text-sm uppercase text-muted-foreground tracking-wider mb-2">
-                  Note Letters
-                </h3>
-                <ScrollArea className="h-64">
-                  <pre className="p-4 bg-background/50 rounded-lg text-base font-mono whitespace-pre-wrap">
-                    {selectedTab.noteHistory}
-                  </pre>
-                </ScrollArea>
-              </div>
+            <div className="grid grid-cols-4 items-start gap-4">
+              <Label htmlFor="tab-holes" className="text-right pt-2">
+                Holes
+              </Label>
+              <Textarea
+                id="tab-holes"
+                value={editHoleHistory}
+                onChange={(event) => setEditHoleHistory(event.target.value)}
+                className="col-span-3 min-h-[140px]"
+              />
             </div>
-            <Button
-              variant="outline"
-              className="mt-4"
-              onClick={() => setSelectedTab(null)}
-            >
-              Close
+            <div className="grid grid-cols-4 items-start gap-4">
+              <Label htmlFor="tab-notes" className="text-right pt-2">
+                Notes
+              </Label>
+              <Textarea
+                id="tab-notes"
+                value={editNoteHistory}
+                onChange={(event) => setEditNoteHistory(event.target.value)}
+                className="col-span-3 min-h-[140px]"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="tab-type" className="text-right">
+                Type
+              </Label>
+              <Select value={editHarmonicaType} onValueChange={(value: HarmonicaType) => setEditHarmonicaType(value)}>
+                <SelectTrigger id="tab-type" className="col-span-3">
+                  <SelectValue placeholder="Select type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="tremolo">Tremolo</SelectItem>
+                  <SelectItem value="diatonic">Diatonic</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditDialogOpen(false)} disabled={isSaving}>
+              Cancel
             </Button>
-          </CardContent>
-        </Card>
-      )}
+            <Button onClick={handleSaveEdit} disabled={isSaving}>
+              {isSaving ? 'Saving...' : 'Save Changes'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
