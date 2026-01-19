@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import Script from "next/script";
 import {
   Dialog,
   DialogContent,
@@ -47,13 +48,21 @@ export default function SaveTabDialog({
   harmonicaType,
   editingTab
 }: SaveTabDialogProps) {
+  const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? '';
   const [title, setTitle] = useState(editingTab?.title || '');
   const [difficulty, setDifficulty] = useState<'Beginner' | 'Intermediate' | 'Advanced' | ''>(editingTab?.difficulty || '');
   const [genre, setGenre] = useState(editingTab?.genre || '');
   const [key, setKey] = useState(editingTab?.key || '');
   const [selectedHarmonicaType, setSelectedHarmonicaType] = useState<HarmonicaType>(editingTab?.harmonicaType || harmonicaType);
   const [isSaving, setIsSaving] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [captchaError, setCaptchaError] = useState<string | null>(null);
+  const [turnstileReady, setTurnstileReady] = useState(false);
+  const captchaContainerRef = useRef<HTMLDivElement | null>(null);
+  const widgetIdRef = useRef<string | null>(null);
   const { toast } = useToast();
+
+  const requiresCaptcha = !editingTab;
 
   useEffect(() => {
     if (open) {
@@ -62,6 +71,8 @@ export default function SaveTabDialog({
       setGenre(editingTab?.genre || '');
       setKey(editingTab?.key || '');
       setSelectedHarmonicaType(editingTab?.harmonicaType || harmonicaType);
+      setCaptchaToken(null);
+      setCaptchaError(null);
     }
   }, [editingTab, harmonicaType, open]);
 
@@ -71,7 +82,42 @@ export default function SaveTabDialog({
       && selectedHarmonicaType
       && key.trim()
       && genre.trim()
+      && (!requiresCaptcha || captchaToken)
   );
+
+  useEffect(() => {
+    const turnstile = (window as Window & { turnstile?: { render: (container: HTMLElement, options: Record<string, unknown>) => string; remove: (widgetId: string) => void; } }).turnstile;
+    if (!open || !requiresCaptcha) {
+      if (widgetIdRef.current && turnstile) {
+        turnstile.remove(widgetIdRef.current);
+      }
+      widgetIdRef.current = null;
+      setCaptchaToken(null);
+      return;
+    }
+
+    if (!turnstileSiteKey) {
+      setCaptchaError('Captcha is not configured.');
+      return;
+    }
+
+    if (!turnstile || !turnstileReady || !captchaContainerRef.current || widgetIdRef.current) {
+      return;
+    }
+
+    widgetIdRef.current = turnstile.render(captchaContainerRef.current, {
+      sitekey: turnstileSiteKey,
+      callback: (token: string) => {
+        setCaptchaToken(token);
+        setCaptchaError(null);
+      },
+      'expired-callback': () => setCaptchaToken(null),
+      'error-callback': () => {
+        setCaptchaToken(null);
+        setCaptchaError('Captcha verification failed. Please try again.');
+      }
+    });
+  }, [open, requiresCaptcha, turnstileReady, turnstileSiteKey]);
 
   const handleSave = async () => {
     if (!title.trim()) {
@@ -119,6 +165,15 @@ export default function SaveTabDialog({
       return;
     }
 
+    if (requiresCaptcha && !captchaToken) {
+      toast({
+        title: "Error",
+        description: "Please complete the captcha.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     if (!holeHistory.trim() && !noteHistory.trim()) {
       toast({
         title: "Error",
@@ -151,7 +206,8 @@ export default function SaveTabDialog({
           selectedHarmonicaType,
           difficulty,
           key.trim(),
-          genre.trim()
+          genre.trim(),
+          captchaToken
         );
       }
 
@@ -165,6 +221,7 @@ export default function SaveTabDialog({
         setDifficulty('');
         setGenre('');
         setKey('');
+        setCaptchaToken(null);
       } else {
         throw new Error('Save operation failed');
       }
@@ -186,6 +243,7 @@ export default function SaveTabDialog({
       setDifficulty('');
       setGenre('');
       setKey('');
+      setCaptchaToken(null);
     }
     onOpenChange(false);
   };
@@ -193,6 +251,14 @@ export default function SaveTabDialog({
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-[425px]">
+        {requiresCaptcha && (
+          <Script
+            src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"
+            async
+            defer
+            onLoad={() => setTurnstileReady(true)}
+          />
+        )}
         <DialogHeader>
           <DialogTitle>
             {editingTab ? 'Update Tab' : 'Save Tab'}
@@ -271,6 +337,17 @@ export default function SaveTabDialog({
               className="col-span-3"
             />
           </div>
+          {requiresCaptcha && (
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label className="text-right">Captcha</Label>
+              <div className="col-span-3 space-y-2">
+                <div ref={captchaContainerRef} />
+                {captchaError && (
+                  <p className="text-xs text-destructive">{captchaError}</p>
+                )}
+              </div>
+            </div>
+          )}
           <div className="text-sm text-muted-foreground">
             <p>Preview:</p>
             <div className="mt-2 p-3 bg-muted rounded-md">

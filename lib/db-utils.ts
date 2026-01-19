@@ -82,25 +82,76 @@ export class AdvancedTabsDB {
   static async getTabsPaginated(
     page: number = 1,
     limit: number = 10,
-    includeAll: boolean = false
+    includeAll: boolean = false,
+    options?: {
+      query?: string;
+      difficulty?: "Beginner" | "Intermediate" | "Advanced";
+      harmonicaType?: "diatonic" | "tremolo";
+      key?: string;
+      sort?: "newest" | "views";
+    }
   ): Promise<{tabs: SavedTab[], total: number, totalPages: number}> {
     try {
       const offset = (page - 1) * limit;
-      
+
+      const whereParams: any[] = [];
+      const whereClauses: string[] = [];
+
+      if (!includeAll) {
+        whereClauses.push(`status = $${whereParams.length + 1}`);
+        whereParams.push("approved");
+      }
+
+      if (options?.query) {
+        whereClauses.push(
+          `to_tsvector('english', title) @@ websearch_to_tsquery('english', $${whereParams.length + 1})`
+        );
+        whereParams.push(options.query);
+      }
+
+      if (options?.difficulty) {
+        whereClauses.push(`difficulty = $${whereParams.length + 1}`);
+        whereParams.push(options.difficulty);
+      }
+
+      if (options?.harmonicaType) {
+        whereClauses.push(`harmonica_type = $${whereParams.length + 1}`);
+        whereParams.push(options.harmonicaType);
+      }
+
+      if (options?.key) {
+        whereClauses.push(`LOWER(music_key) = LOWER($${whereParams.length + 1})`);
+        whereParams.push(options.key);
+      }
+
+      const whereSql = whereClauses.length > 0 ? `WHERE ${whereClauses.join(" AND ")}` : "";
+      const orderSql =
+        options?.sort === "views"
+          ? "ORDER BY COALESCE(view_count, 0) DESC, created_at DESC"
+          : "ORDER BY created_at DESC";
+
+      const tabsQuery = `
+        SELECT id, title, hole_history as "holeHistory", note_history as "noteHistory", 
+               harmonica_type as "harmonicaType", difficulty, genre, music_key as "key",
+               rejection_reason as "rejectionReason",
+               status, view_count as "viewCount", created_at as "createdAt", updated_at as "updatedAt"
+        FROM harmonica_tabs 
+        ${whereSql}
+        ${orderSql}
+        LIMIT $${whereParams.length + 1} OFFSET $${whereParams.length + 2}
+      `;
+
+      const countQuery = `
+        SELECT COUNT(*) as count
+        FROM harmonica_tabs
+        ${whereSql}
+      `;
+
+      const tabsParams = [...whereParams, limit, offset];
+
       const [tabs, totalResult] = await Promise.all([
-        sql`
-          SELECT id, title, hole_history as "holeHistory", note_history as "noteHistory", 
-                 harmonica_type as "harmonicaType", difficulty, genre, music_key as "key",
-                 rejection_reason as "rejectionReason",
-                 status, created_at as "createdAt", updated_at as "updatedAt"
-          FROM harmonica_tabs 
-          ${includeAll ? sql`` : sql`WHERE status = 'approved'`}
-          ORDER BY updated_at DESC
-          LIMIT ${limit} OFFSET ${offset}
-        `,
-        includeAll
-          ? sql`SELECT COUNT(*) as count FROM harmonica_tabs`
-          : sql`SELECT COUNT(*) as count FROM harmonica_tabs WHERE status = 'approved'`
+        sql.query(tabsQuery, tabsParams),
+        sql.query(countQuery, whereParams)
       ]);
 
       const total = Number(totalResult[0].count);

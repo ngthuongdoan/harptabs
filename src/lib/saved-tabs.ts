@@ -36,7 +36,8 @@ export class SavedTabsManager {
     harmonicaType: 'diatonic' | 'tremolo',
     difficulty: 'Beginner' | 'Intermediate' | 'Advanced',
     key: string,
-    genre: string
+    genre: string,
+    captchaToken?: string | null
   ): Promise<SavedTab | null> {
     try {
       const response = await fetch('/api/tabs', {
@@ -52,6 +53,7 @@ export class SavedTabsManager {
           difficulty,
           key,
           genre,
+          captchaToken,
         }),
       });
       

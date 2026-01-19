@@ -1,4 +1,5 @@
 import { neon } from "@neondatabase/serverless";
+import { createHash } from "crypto";
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -18,6 +19,40 @@ export interface SavedTab {
   viewCount: number;
   createdAt: Date;
   updatedAt: Date;
+}
+
+export interface RateLimitStatus {
+  allowed: boolean;
+  remaining: number;
+  resetAt: Date | null;
+}
+
+function normalizeTabField(value: string | null | undefined): string {
+  return (value ?? "").replace(/\r\n/g, "\n").trim();
+}
+
+export function buildTabContentHash(params: {
+  title: string;
+  holeHistory: string;
+  noteHistory: string;
+  harmonicaType: 'diatonic' | 'tremolo';
+  difficulty: 'Beginner' | 'Intermediate' | 'Advanced';
+  key: string;
+  genre: string;
+}): string {
+  const normalized = {
+    title: normalizeTabField(params.title),
+    holeHistory: normalizeTabField(params.holeHistory),
+    noteHistory: normalizeTabField(params.noteHistory),
+    harmonicaType: params.harmonicaType,
+    difficulty: params.difficulty,
+    key: normalizeTabField(params.key).toLowerCase(),
+    genre: normalizeTabField(params.genre).toLowerCase()
+  };
+
+  return createHash("sha256")
+    .update(JSON.stringify(normalized))
+    .digest("hex");
 }
 
 // Helper function to detect harmonica type from hole history
@@ -102,6 +137,29 @@ export async function initializeDatabase() {
       ADD COLUMN IF NOT EXISTS view_count INTEGER DEFAULT 0
     `;
 
+    await sql`
+      CREATE TABLE IF NOT EXISTS submission_rate_limits (
+        id SERIAL PRIMARY KEY,
+        ip_address VARCHAR(100) NOT NULL,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      )
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS submission_rate_limits_ip_created_at_idx
+      ON submission_rate_limits (ip_address, created_at DESC)
+    `;
+
+    await sql`
+      ALTER TABLE harmonica_tabs 
+      ADD COLUMN IF NOT EXISTS content_hash VARCHAR(64)
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS harmonica_tabs_content_hash_idx
+      ON harmonica_tabs (content_hash)
+    `;
+
     await sql`      ALTER TABLE harmonica_tabs 
       ADD COLUMN IF NOT EXISTS view_count INTEGER DEFAULT 0
     `;
@@ -132,6 +190,30 @@ export async function initializeDatabase() {
       await sql`
         UPDATE harmonica_tabs 
         SET harmonica_type = ${detectedType}
+        WHERE id = ${tab.id}
+      `;
+    }
+
+    const tabsMissingHash = await sql`
+      SELECT id, title, hole_history, note_history, harmonica_type, difficulty, genre, music_key
+      FROM harmonica_tabs
+      WHERE content_hash IS NULL OR content_hash = ''
+    `;
+
+    for (const tab of tabsMissingHash) {
+      const hash = buildTabContentHash({
+        title: tab.title,
+        holeHistory: tab.hole_history ?? "",
+        noteHistory: tab.note_history ?? "",
+        harmonicaType: tab.harmonica_type ?? "diatonic",
+        difficulty: tab.difficulty ?? "Beginner",
+        key: tab.music_key ?? "",
+        genre: tab.genre ?? ""
+      });
+
+      await sql`
+        UPDATE harmonica_tabs
+        SET content_hash = ${hash}
         WHERE id = ${tab.id}
       `;
     }
@@ -215,14 +297,23 @@ export class TabsDB {
       const now = new Date();
       const id = `tab-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
       const finalHarmonicaType = harmonicaType || detectHarmonicaType(holeHistory);
+      const contentHash = buildTabContentHash({
+        title,
+        holeHistory,
+        noteHistory,
+        harmonicaType: finalHarmonicaType,
+        difficulty,
+        key,
+        genre
+      });
       
       const data = await sql`
         INSERT INTO harmonica_tabs (
-          id, title, hole_history, note_history, harmonica_type, difficulty, genre, music_key, status, created_at, updated_at
+          id, title, hole_history, note_history, harmonica_type, difficulty, genre, music_key, status, content_hash, created_at, updated_at
         )
         VALUES (
           ${id}, ${title}, ${holeHistory}, ${noteHistory}, ${finalHarmonicaType}, ${difficulty}, ${genre}, ${key},
-          'pending', ${now.toISOString()}, ${now.toISOString()}
+          'pending', ${contentHash}, ${now.toISOString()}, ${now.toISOString()}
         )
         RETURNING id, title, hole_history as "holeHistory", note_history as "noteHistory", 
                   harmonica_type as "harmonicaType", difficulty, genre, music_key as "key",
@@ -442,5 +533,55 @@ export class TabsDB {
       console.error('Error incrementing view count:', error);
       throw error;
     }
+  }
+
+  static async getTabByContentHash(hash: string): Promise<SavedTab | null> {
+    try {
+      const data = await sql`
+        SELECT id, title, hole_history as "holeHistory", note_history as "noteHistory", 
+               harmonica_type as "harmonicaType", difficulty, genre, music_key as "key",
+               rejection_reason as "rejectionReason",
+               status, view_count as "viewCount", created_at as "createdAt", updated_at as "updatedAt"
+        FROM harmonica_tabs
+        WHERE content_hash = ${hash}
+        LIMIT 1
+      `;
+      return data[0] as SavedTab || null;
+    } catch (error) {
+      console.error('Error fetching tab by content hash:', error);
+      throw error;
+    }
+  }
+}
+
+export class RateLimitDB {
+  static async checkAndRecordSubmission(
+    ipAddress: string,
+    limit: number = 3,
+    windowHours: number = 1
+  ): Promise<RateLimitStatus> {
+    const data = await sql`
+      SELECT COUNT(*) as count, MIN(created_at) as oldest
+      FROM submission_rate_limits
+      WHERE ip_address = ${ipAddress}
+        AND created_at >= NOW() - (${windowHours} * INTERVAL '1 hour')
+    `;
+
+    const count = Number(data[0]?.count ?? 0);
+    const oldest = data[0]?.oldest ? new Date(data[0].oldest) : null;
+
+    if (count >= limit) {
+      const resetAt = oldest ? new Date(oldest.getTime() + windowHours * 60 * 60 * 1000) : null;
+      return { allowed: false, remaining: 0, resetAt };
+    }
+
+    await sql`
+      INSERT INTO submission_rate_limits (ip_address)
+      VALUES (${ipAddress})
+    `;
+
+    const base = oldest ?? new Date();
+    const resetAt = new Date(base.getTime() + windowHours * 60 * 60 * 1000);
+    return { allowed: true, remaining: Math.max(limit - (count + 1), 0), resetAt };
   }
 }
