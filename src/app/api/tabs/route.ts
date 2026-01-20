@@ -58,15 +58,28 @@ async function verifyTurnstileToken(token: string | undefined, request: NextRequ
   return { ok: true };
 }
 
-// GET /api/tabs - List all tabs
+// GET /api/tabs?limit=50&offset=0 - List tabs with pagination
 export async function GET(request: NextRequest) {
   try {
+    const { searchParams } = new URL(request.url);
+    const limitParam = searchParams.get('limit');
+    const offsetParam = searchParams.get('offset');
+    const limit = limitParam ? Number.parseInt(limitParam, 10) : 50;
+    const offset = offsetParam ? Number.parseInt(offsetParam, 10) : 0;
+
+    if (!Number.isFinite(limit) || !Number.isFinite(offset) || limit < 1 || limit > 100 || offset < 0) {
+      return NextResponse.json(
+        { error: 'Invalid pagination parameters. Limit must be 1-100 and offset must be >= 0.' },
+        { status: 400 }
+      );
+    }
+
     // Ensure database is initialized
     await initializeDatabase();
     
     // If admin authenticated, show all tabs (including pending)
     const includeAll = isAuthenticated(request);
-    const tabs = await TabsDB.getAllTabs(includeAll);
+    const tabs = await TabsDB.getAllTabs(includeAll, limit, offset);
     return NextResponse.json(tabs);
   } catch (error) {
     console.error('Error listing tabs:', error);

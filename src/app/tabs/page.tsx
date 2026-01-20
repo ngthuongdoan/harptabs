@@ -3,6 +3,8 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft, Plus } from "lucide-react";
 import ApprovedTabsLibrary from "@/components/approved-tabs-library";
 
+export const revalidate = 60;
+
 export default function TabsLibraryPage() {
   return (
     <main className="flex min-h-screen w-full flex-col p-4 sm:p-8 md:p-12 bg-background">

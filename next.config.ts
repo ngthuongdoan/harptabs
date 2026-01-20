@@ -5,6 +5,19 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
+  async headers() {
+    return [
+      {
+        source: '/tabs/:path*',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, s-maxage=60, stale-while-revalidate=60',
+          },
+        ],
+      },
+    ];
+  },
   turbopack: {
     root: process.cwd(),
   },

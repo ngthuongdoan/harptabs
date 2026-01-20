@@ -231,7 +231,11 @@ export async function initializeDatabase() {
 
 // Database operations
 export class TabsDB {
-  static async getAllTabs(includeAll: boolean = false): Promise<SavedTab[]> {
+  static async getAllTabs(
+    includeAll: boolean = false,
+    limit: number = 50,
+    offset: number = 0
+  ): Promise<SavedTab[]> {
     try {
       const data = includeAll
         ? await sql`
@@ -241,6 +245,7 @@ export class TabsDB {
                    status, view_count as "viewCount", created_at as "createdAt", updated_at as "updatedAt"
             FROM harmonica_tabs 
             ORDER BY updated_at DESC
+            LIMIT ${limit} OFFSET ${offset}
           `
         : await sql`
             SELECT id, title, hole_history as "holeHistory", note_history as "noteHistory", 
@@ -250,6 +255,7 @@ export class TabsDB {
             FROM harmonica_tabs 
             WHERE status = 'approved'
             ORDER BY updated_at DESC
+            LIMIT ${limit} OFFSET ${offset}
           `;
       return data as SavedTab[];
     } catch (error) {
@@ -549,6 +555,21 @@ export class TabsDB {
       return data[0] as SavedTab || null;
     } catch (error) {
       console.error('Error fetching tab by content hash:', error);
+      throw error;
+    }
+  }
+
+  static async getApprovedTabsForSitemap(): Promise<Array<Pick<SavedTab, "id" | "updatedAt">>> {
+    try {
+      const data = await sql`
+        SELECT id, updated_at as "updatedAt"
+        FROM harmonica_tabs
+        WHERE status = 'approved'
+        ORDER BY updated_at DESC
+      `;
+      return data as Array<Pick<SavedTab, "id" | "updatedAt">>;
+    } catch (error) {
+      console.error('Error fetching approved tabs for sitemap:', error);
       throw error;
     }
   }
