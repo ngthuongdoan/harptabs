@@ -133,6 +133,7 @@ export class AdvancedTabsDB {
       const tabsQuery = `
         SELECT id, title, hole_history as "holeHistory", note_history as "noteHistory", 
                harmonica_type as "harmonicaType", difficulty, genre, music_key as "key",
+               thumbnail_url as "thumbnailUrl", youtube_link as "youtubeLink",
                rejection_reason as "rejectionReason",
                status, view_count as "viewCount", created_at as "createdAt", updated_at as "updatedAt"
         FROM harmonica_tabs 
@@ -182,6 +183,7 @@ export class AdvancedTabsDB {
       let query = `
         SELECT id, title, hole_history as "holeHistory", note_history as "noteHistory", 
                harmonica_type as "harmonicaType", difficulty, genre, music_key as "key",
+               thumbnail_url as "thumbnailUrl", youtube_link as "youtubeLink",
                rejection_reason as "rejectionReason",
                status, created_at as "createdAt", updated_at as "updatedAt"
         FROM harmonica_tabs 

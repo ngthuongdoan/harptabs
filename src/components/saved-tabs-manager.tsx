@@ -225,7 +225,8 @@ export default function SavedTabsManagerDialog({
             difficulty: selectedTab.difficulty,
             genre: selectedTab.genre,
             key: selectedTab.key,
-            harmonicaType: selectedTab.harmonicaType
+            harmonicaType: selectedTab.harmonicaType,
+            youtubeLink: selectedTab.youtubeLink
           }}
         />
       )}

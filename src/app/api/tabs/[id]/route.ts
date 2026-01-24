@@ -36,7 +36,17 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
   
   try {
     const { id } = await params;
-    const { title, holeHistory, noteHistory, harmonicaType, difficulty, key, genre } = await request.json();
+    const {
+      title,
+      holeHistory,
+      noteHistory,
+      harmonicaType,
+      difficulty,
+      key,
+      genre,
+      youtubeLink,
+      thumbnailUrl
+    } = await request.json();
     
     if (!title || typeof title !== 'string') {
       return NextResponse.json({ error: 'Title is required' }, { status: 400 });
@@ -44,6 +54,9 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     
     await initializeDatabase();
     
+    const normalizedYoutubeLink = typeof youtubeLink === 'string' ? youtubeLink.trim() : null;
+    const normalizedThumbnailUrl = typeof thumbnailUrl === 'string' ? thumbnailUrl.trim() : null;
+
     const updatedTab = await TabsDB.updateTab(
       id,
       title.trim(),
@@ -52,7 +65,9 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       harmonicaType,
       difficulty ?? null,
       typeof key === 'string' ? key.trim() : null,
-      typeof genre === 'string' ? genre.trim() : null
+      typeof genre === 'string' ? genre.trim() : null,
+      normalizedYoutubeLink && normalizedYoutubeLink.length > 0 ? normalizedYoutubeLink : null,
+      normalizedThumbnailUrl && normalizedThumbnailUrl.length > 0 ? normalizedThumbnailUrl : null
     );
     
     if (!updatedTab) {

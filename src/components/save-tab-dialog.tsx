@@ -31,6 +31,7 @@ type DifficultyLevel = 'Beginner' | 'Intermediate' | 'Advanced';
 type SaveTabFormValues = {
   musicTitle: string;
   singer: string;
+  youtubeLink: string;
   difficulty: DifficultyLevel | '';
   harmonicaType: HarmonicaType;
 };
@@ -48,6 +49,7 @@ interface SaveTabDialogProps {
     genre: string;
     key: string;
     harmonicaType: HarmonicaType;
+    youtubeLink?: string | null;
   } | null;
 }
 
@@ -78,6 +80,7 @@ export default function SaveTabDialog({
     (): SaveTabFormValues => ({
       musicTitle: editingTab?.title ?? '',
       singer: '',
+      youtubeLink: editingTab?.youtubeLink ?? '',
       difficulty: editingTab?.difficulty ?? '',
       harmonicaType: editingTab?.harmonicaType ?? harmonicaType
     }),
@@ -133,6 +136,12 @@ export default function SaveTabDialog({
       }
 
       try {
+        const selectedLookup = selectedLookupIndex !== null
+          ? lookupResults[selectedLookupIndex] ?? null
+          : null;
+        const selectedThumbnail = selectedLookup?.image ?? null;
+        const normalizedYoutubeLink = value.youtubeLink.trim() || null;
+
         let result;
         if (editingTab) {
           result = await SavedTabsManager.updateTab(
@@ -141,7 +150,11 @@ export default function SaveTabDialog({
             holeHistory,
             noteHistory,
             value.harmonicaType,
-            value.difficulty
+            value.difficulty,
+            '',
+            '',
+            normalizedYoutubeLink,
+            selectedThumbnail
           );
         } else {
           result = await SavedTabsManager.saveTab(
@@ -152,6 +165,8 @@ export default function SaveTabDialog({
             value.difficulty,
             '',
             '',
+            normalizedYoutubeLink,
+            selectedThumbnail,
             captchaToken
           );
         }
@@ -279,6 +294,10 @@ export default function SaveTabDialog({
       );
 
       setLookupResults(response.results);
+      const currentYoutubeLink = form.state.values.youtubeLink?.trim();
+      if (!currentYoutubeLink && response.youtube) {
+        form.setFieldValue('youtubeLink', response.youtube);
+      }
     } catch (error) {
       if (!(error instanceof DOMException && error.name === "AbortError")) {
         setLookupError("Music lookup failed. Please try again.");
@@ -368,6 +387,24 @@ export default function SaveTabDialog({
                   {isLookupLoading ? "Looking..." : "Lookup"}
                 </Button>
               </div>
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="youtube-link" className="text-right">
+                YouTube Link
+              </Label>
+              <form.Field
+                name="youtubeLink"
+                children={(field) => (
+                  <Input
+                    id="youtube-link"
+                    value={field.state.value}
+                    onChange={(e) => field.handleChange(e.target.value)}
+                    onBlur={field.handleBlur}
+                    placeholder="https://www.youtube.com/watch?v=..."
+                    className="col-span-3"
+                  />
+                )}
+              />
             </div>
             {(lookupError || lookupResults.length > 0) && (
               <div className="grid grid-cols-4 items-center gap-4">

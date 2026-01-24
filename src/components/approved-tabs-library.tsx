@@ -1,16 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { TabCard } from "@/components/tab-card";
+import { TabViewDialog } from "@/components/tab-view-dialog";
+import { ResponsiveTabGrid } from "@/components/responsive-tab-grid";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -19,18 +14,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useToast } from "@/hooks/use-toast";
 import { useTabViewTracking } from "@/hooks/use-tab-view-tracking";
-import { Eye, ChevronLeft, ChevronRight } from "lucide-react";
-import { TabCard, TabTypeBadge } from "@/components/tab-card";
-import { TabContentView, TabPreview } from "@/components/tab-content-view";
+import { useToast } from "@/hooks/use-toast";
 import { formatDateShort } from "@/lib/tab-utils";
+import { ChevronLeft, ChevronRight, Eye } from "lucide-react";
+import { useEffect, useState } from "react";
 import type { SavedTab } from "../../lib/db";
-import {
-  convertDiatonicToTremolo,
-  convertTremoloToDiatonic,
-  type HarmonicaType,
-} from "@/lib/harmonica";
 
 const PAGE_SIZE = 9;
 
@@ -47,7 +36,10 @@ export default function ApprovedTabsLibrary() {
   const [keyFilter, setKeyFilter] = useState("");
   const [sortOption, setSortOption] = useState<"newest" | "views">("newest");
   const [selectedTab, setSelectedTab] = useState<SavedTab | null>(null);
-  const [viewHarmonicaType, setViewHarmonicaType] = useState<HarmonicaType | null>(null);
+  const [alertDialog, setAlertDialog] = useState<{
+    title: string;
+    description: string;
+  } | null>(null);
   const { toast } = useToast();
   const { trackView } = useTabViewTracking();
 
@@ -112,7 +104,6 @@ export default function ApprovedTabsLibrary() {
 
   const handleViewTab = async (tab: SavedTab) => {
     setSelectedTab(tab);
-    setViewHarmonicaType(tab.harmonicaType);
 
     // Track view - updates database and session storage
     const tracked = await trackView(tab.id);
@@ -129,48 +120,19 @@ export default function ApprovedTabsLibrary() {
     }
   };
 
-  const getTabDisplayData = (tab: SavedTab, targetType: HarmonicaType) => {
-    if (targetType === tab.harmonicaType) {
-      return {
-        holeHistory: tab.holeHistory,
-        errors: [] as string[],
-        warnings: [] as string[],
-        isConverted: false,
-        usedFallback: false,
-      };
-    }
-
-    const result =
-      tab.harmonicaType === "diatonic"
-        ? convertDiatonicToTremolo(tab.holeHistory)
-        : convertTremoloToDiatonic(tab.holeHistory);
-
-    const hasConvertedTab = Boolean(result.convertedTab);
-    return {
-      holeHistory: hasConvertedTab ? result.convertedTab : tab.holeHistory,
-      errors: result.errors,
-      warnings: result.warnings,
-      isConverted: true,
-      usedFallback: !hasConvertedTab,
-    };
-  };
-
-  const activeViewType = selectedTab
-    ? viewHarmonicaType ?? selectedTab.harmonicaType
-    : null;
-  const displayData =
-    selectedTab && activeViewType
-      ? getTabDisplayData(selectedTab, activeViewType)
-      : null;
-
   const canGoBack = page > 1;
   const canGoForward = page < totalPages;
   const startIndex = totalTabs === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
   const endIndex = Math.min(page * PAGE_SIZE, totalTabs);
+  const isAlertDialogOpen = Boolean(alertDialog);
+
+  const openAlertDialog = (title: string, description: string) => {
+    setAlertDialog({ title, description });
+  };
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-3 md:grid-cols-[minmax(0,2fr)_repeat(3,minmax(0,1fr))]">
+      <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-[minmax(0,2fr)_repeat(3,minmax(0,1fr))]">
         <div className="space-y-1">
           <label className="text-sm text-muted-foreground" htmlFor="tab-search">
             Search by title
@@ -249,7 +211,7 @@ export default function ApprovedTabsLibrary() {
               setPage(1);
             }}
           >
-            <SelectTrigger className="w-[180px]">
+            <SelectTrigger className="w-full sm:w-[180px]">
               <SelectValue placeholder="Sort by" />
             </SelectTrigger>
             <SelectContent>
@@ -264,9 +226,10 @@ export default function ApprovedTabsLibrary() {
             onClick={() => setPage((prev) => Math.max(1, prev - 1))}
           >
             <ChevronLeft className="h-4 w-4 mr-1" />
-            Previous
+            <span className="hidden sm:inline">Previous</span>
+            <span className="sm:hidden">Prev</span>
           </Button>
-          <span className="text-sm text-muted-foreground">
+          <span className="text-sm text-muted-foreground whitespace-nowrap">
             Page {page} of {totalPages}
           </span>
           <Button
@@ -275,7 +238,8 @@ export default function ApprovedTabsLibrary() {
             disabled={!canGoForward}
             onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
           >
-            Next
+            <span className="hidden sm:inline">Next</span>
+            <span className="sm:hidden">Next</span>
             <ChevronRight className="h-4 w-4 ml-1" />
           </Button>
         </div>
@@ -293,16 +257,14 @@ export default function ApprovedTabsLibrary() {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {tabs.map((tab) => (
-            <div key={tab.id} className="space-y-2">
-              <TabCard
-                tab={tab}
-                dateFormatter={formatDateShort}
-                additionalBadges={<Badge variant="secondary">Approved</Badge>}
-              >
-                <TabPreview holeHistory={tab.holeHistory} />
-              </TabCard>
+            <ResponsiveTabGrid>
+              {tabs.map((tab) => (
+            <TabCard
+              key={tab.id}
+              tab={tab}
+              dateFormatter={formatDateShort}
+              additionalBadges={<Badge variant="secondary">Approved</Badge>}
+            >
               <Button
                 variant="outline"
                 size="sm"
@@ -312,78 +274,35 @@ export default function ApprovedTabsLibrary() {
                 <Eye className="h-4 w-4 mr-2" />
                 View Full Tab
               </Button>
-            </div>
+            </TabCard>
           ))}
-        </div>
+            </ResponsiveTabGrid>
       )}
 
-      <Dialog open={!!selectedTab} onOpenChange={(open) => !open && setSelectedTab(null)}>
-        <DialogContent className="max-w-full h-full md:max-w-4xl md:h-[90vh] flex flex-col">
-          {selectedTab && (
-            <>
-              <DialogHeader>
-                <div className="flex items-start justify-between">
-                  <div>
-                    <DialogTitle className="text-2xl">{selectedTab.title}</DialogTitle>
-                    <DialogDescription>
-                      Created on {formatDateShort(selectedTab.createdAt)}
-                    </DialogDescription>
-                  </div>
-                  <TabTypeBadge type={selectedTab.harmonicaType} />
-                </div>
-              </DialogHeader>
-              <div className="flex-1 overflow-auto">
-                {selectedTab && displayData && (
-                  <>
-                    <div className="flex flex-col gap-2 mb-4">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-sm text-muted-foreground">View as:</span>
-                        <Button
-                          variant={activeViewType === "diatonic" ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => setViewHarmonicaType("diatonic")}
-                        >
-                          Diatonic
-                        </Button>
-                        <Button
-                          variant={activeViewType === "tremolo" ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => setViewHarmonicaType("tremolo")}
-                        >
-                          Tremolo
-                        </Button>
-                        {activeViewType !== selectedTab.harmonicaType && (
-                          <Badge variant="secondary">Converted</Badge>
-                        )}
-                      </div>
-                      {displayData.isConverted &&
-                        (displayData.errors.length > 0 || displayData.warnings.length > 0) && (
-                          <p className="text-xs text-muted-foreground">
-                            {displayData.usedFallback &&
-                              "Conversion failed; showing original tab. "}
-                            {displayData.errors.length > 0 &&
-                              `Errors: ${displayData.errors.join("; ")}. `}
-                            {displayData.warnings.length > 0 &&
-                              `Warnings: ${displayData.warnings.join("; ")}.`}
-                          </p>
-                        )}
-                    </div>
+      <TabViewDialog
+        tab={selectedTab}
+        open={!!selectedTab}
+        onOpenChange={(open) => !open && setSelectedTab(null)}
+        dateFormatter={formatDateShort}
+        additionalBadges={<Badge variant="secondary">Approved</Badge>}
+        showDetailedErrors={true}
+      >
+        <Button variant="outline" onClick={() => setSelectedTab(null)}>
+          Close
+        </Button>
+      </TabViewDialog>
 
-                    <TabContentView
-                      holeHistory={displayData.holeHistory}
-                      noteHistory={selectedTab.noteHistory}
-                      height="h-96"
-                    />
-                  </>
-                )}
-              </div>
-              <DialogFooter className="flex-shrink-0 gap-2">
-                <Button variant="outline" onClick={() => setSelectedTab(null)}>
-                  Close
-                </Button>
-              </DialogFooter>
-            </>
-          )}
+      <Dialog open={isAlertDialogOpen} onOpenChange={(open) => !open && setAlertDialog(null)}>
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{alertDialog?.title}</DialogTitle>
+            <DialogDescription>{alertDialog?.description}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAlertDialog(null)}>
+              Close
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

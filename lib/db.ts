@@ -14,6 +14,8 @@ export interface SavedTab {
   difficulty: 'Beginner' | 'Intermediate' | 'Advanced';
   genre: string;
   key: string;
+  thumbnailUrl: string | null;
+  youtubeLink: string | null;
   status: TabStatus;
   rejectionReason: string | null;
   viewCount: number;
@@ -93,6 +95,8 @@ export async function initializeDatabase() {
         difficulty VARCHAR(50) DEFAULT 'Beginner',
         genre VARCHAR(100) DEFAULT '',
         music_key VARCHAR(50) DEFAULT '',
+        thumbnail_url TEXT,
+        youtube_link TEXT,
         rejection_reason TEXT,
         status VARCHAR(20) DEFAULT 'pending',
         created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -125,6 +129,16 @@ export async function initializeDatabase() {
     await sql`
       ALTER TABLE harmonica_tabs 
       ADD COLUMN IF NOT EXISTS music_key VARCHAR(50) DEFAULT ''
+    `;
+
+    await sql`
+      ALTER TABLE harmonica_tabs
+      ADD COLUMN IF NOT EXISTS thumbnail_url TEXT
+    `;
+
+    await sql`
+      ALTER TABLE harmonica_tabs
+      ADD COLUMN IF NOT EXISTS youtube_link TEXT
     `;
 
     await sql`
@@ -241,6 +255,7 @@ export class TabsDB {
         ? await sql`
             SELECT id, title, hole_history as "holeHistory", note_history as "noteHistory", 
                    harmonica_type as "harmonicaType", difficulty, genre, music_key as "key",
+                   thumbnail_url as "thumbnailUrl", youtube_link as "youtubeLink",
                    rejection_reason as "rejectionReason",
                    status, view_count as "viewCount", created_at as "createdAt", updated_at as "updatedAt"
             FROM harmonica_tabs 
@@ -250,6 +265,7 @@ export class TabsDB {
         : await sql`
             SELECT id, title, hole_history as "holeHistory", note_history as "noteHistory", 
                    harmonica_type as "harmonicaType", difficulty, genre, music_key as "key",
+                   thumbnail_url as "thumbnailUrl", youtube_link as "youtubeLink",
                    rejection_reason as "rejectionReason",
                    status, view_count as "viewCount", created_at as "createdAt", updated_at as "updatedAt"
             FROM harmonica_tabs 
@@ -270,6 +286,7 @@ export class TabsDB {
         ? await sql`
             SELECT id, title, hole_history as "holeHistory", note_history as "noteHistory", 
                    harmonica_type as "harmonicaType", difficulty, genre, music_key as "key",
+                   thumbnail_url as "thumbnailUrl", youtube_link as "youtubeLink",
                    rejection_reason as "rejectionReason",
                    status, view_count as "viewCount", created_at as "createdAt", updated_at as "updatedAt"
             FROM harmonica_tabs 
@@ -278,6 +295,7 @@ export class TabsDB {
         : await sql`
             SELECT id, title, hole_history as "holeHistory", note_history as "noteHistory", 
                    harmonica_type as "harmonicaType", difficulty, genre, music_key as "key",
+                   thumbnail_url as "thumbnailUrl", youtube_link as "youtubeLink",
                    rejection_reason as "rejectionReason",
                    status, view_count as "viewCount", created_at as "createdAt", updated_at as "updatedAt"
             FROM harmonica_tabs 
@@ -297,7 +315,9 @@ export class TabsDB {
     difficulty: 'Beginner' | 'Intermediate' | 'Advanced',
     key: string,
     genre: string,
-    harmonicaType?: 'diatonic' | 'tremolo'
+    harmonicaType?: 'diatonic' | 'tremolo',
+    youtubeLink?: string | null,
+    thumbnailUrl?: string | null
   ): Promise<SavedTab> {
     try {
       const now = new Date();
@@ -315,14 +335,17 @@ export class TabsDB {
       
       const data = await sql`
         INSERT INTO harmonica_tabs (
-          id, title, hole_history, note_history, harmonica_type, difficulty, genre, music_key, status, content_hash, created_at, updated_at
+          id, title, hole_history, note_history, harmonica_type, difficulty, genre, music_key,
+          thumbnail_url, youtube_link, status, content_hash, created_at, updated_at
         )
         VALUES (
           ${id}, ${title}, ${holeHistory}, ${noteHistory}, ${finalHarmonicaType}, ${difficulty}, ${genre}, ${key},
+          ${thumbnailUrl ?? null}, ${youtubeLink ?? null},
           'pending', ${contentHash}, ${now.toISOString()}, ${now.toISOString()}
         )
         RETURNING id, title, hole_history as "holeHistory", note_history as "noteHistory", 
                   harmonica_type as "harmonicaType", difficulty, genre, music_key as "key",
+                  thumbnail_url as "thumbnailUrl", youtube_link as "youtubeLink",
                   rejection_reason as "rejectionReason",
                   status, view_count as "viewCount", created_at as "createdAt", updated_at as "updatedAt"
       `;
@@ -341,7 +364,9 @@ export class TabsDB {
     harmonicaType?: 'diatonic' | 'tremolo',
     difficulty?: 'Beginner' | 'Intermediate' | 'Advanced' | null,
     key?: string | null,
-    genre?: string | null
+    genre?: string | null,
+    youtubeLink?: string | null,
+    thumbnailUrl?: string | null
   ): Promise<SavedTab | null> {
     try {
       const now = new Date();
@@ -354,10 +379,13 @@ export class TabsDB {
             difficulty = COALESCE(${difficulty}, difficulty),
             genre = COALESCE(${genre}, genre),
             music_key = COALESCE(${key}, music_key),
+            youtube_link = COALESCE(${youtubeLink}, youtube_link),
+            thumbnail_url = COALESCE(${thumbnailUrl}, thumbnail_url),
             updated_at = ${now.toISOString()}
         WHERE id = ${id}
         RETURNING id, title, hole_history as "holeHistory", note_history as "noteHistory", 
                   harmonica_type as "harmonicaType", difficulty, genre, music_key as "key",
+                  thumbnail_url as "thumbnailUrl", youtube_link as "youtubeLink",
                   rejection_reason as "rejectionReason",
                   status, view_count as "viewCount", created_at as "createdAt", updated_at as "updatedAt"
       `;
@@ -400,6 +428,7 @@ export class TabsDB {
         WHERE id = ${id}
         RETURNING id, title, hole_history as "holeHistory", note_history as "noteHistory", 
                   harmonica_type as "harmonicaType", difficulty, genre, music_key as "key",
+                  thumbnail_url as "thumbnailUrl", youtube_link as "youtubeLink",
                   rejection_reason as "rejectionReason",
                   status, view_count as "viewCount", created_at as "createdAt", updated_at as "updatedAt"
       `;
@@ -415,6 +444,7 @@ export class TabsDB {
       const data = await sql`
         SELECT id, title, hole_history as "holeHistory", note_history as "noteHistory", 
                harmonica_type as "harmonicaType", difficulty, genre, music_key as "key",
+               thumbnail_url as "thumbnailUrl", youtube_link as "youtubeLink",
                rejection_reason as "rejectionReason",
                status, view_count as "viewCount", created_at as "createdAt", updated_at as "updatedAt"
         FROM harmonica_tabs 
@@ -448,6 +478,7 @@ export class TabsDB {
         ? await sql`
             SELECT id, title, hole_history as "holeHistory", note_history as "noteHistory", 
                    harmonica_type as "harmonicaType", difficulty, genre, music_key as "key",
+                   thumbnail_url as "thumbnailUrl", youtube_link as "youtubeLink",
                    rejection_reason as "rejectionReason",
                    status, view_count as "viewCount", created_at as "createdAt", updated_at as "updatedAt"
             FROM harmonica_tabs 
@@ -457,6 +488,7 @@ export class TabsDB {
         : await sql`
             SELECT id, title, hole_history as "holeHistory", note_history as "noteHistory", 
                    harmonica_type as "harmonicaType", difficulty, genre, music_key as "key",
+                   thumbnail_url as "thumbnailUrl", youtube_link as "youtubeLink",
                    rejection_reason as "rejectionReason",
                    status, view_count as "viewCount", created_at as "createdAt", updated_at as "updatedAt"
             FROM harmonica_tabs 
@@ -488,6 +520,7 @@ export class TabsDB {
         ? await sql`
             SELECT id, title, hole_history as "holeHistory", note_history as "noteHistory", 
                    harmonica_type as "harmonicaType", difficulty, genre, music_key as "key",
+                   thumbnail_url as "thumbnailUrl", youtube_link as "youtubeLink",
                    rejection_reason as "rejectionReason",
                    status, view_count as "viewCount", created_at as "createdAt", updated_at as "updatedAt"
             FROM harmonica_tabs 
@@ -497,6 +530,7 @@ export class TabsDB {
         : await sql`
             SELECT id, title, hole_history as "holeHistory", note_history as "noteHistory", 
                    harmonica_type as "harmonicaType", difficulty, genre, music_key as "key",
+                   thumbnail_url as "thumbnailUrl", youtube_link as "youtubeLink",
                    rejection_reason as "rejectionReason",
                    status, view_count as "viewCount", created_at as "createdAt", updated_at as "updatedAt"
             FROM harmonica_tabs 
@@ -531,6 +565,7 @@ export class TabsDB {
         WHERE id = ${id} AND status = 'approved'
         RETURNING id, title, hole_history as "holeHistory", note_history as "noteHistory", 
                   harmonica_type as "harmonicaType", difficulty, genre, music_key as "key",
+                  thumbnail_url as "thumbnailUrl", youtube_link as "youtubeLink",
                   rejection_reason as "rejectionReason",
                   status, view_count as "viewCount", created_at as "createdAt", updated_at as "updatedAt"
       `;
@@ -546,6 +581,7 @@ export class TabsDB {
       const data = await sql`
         SELECT id, title, hole_history as "holeHistory", note_history as "noteHistory", 
                harmonica_type as "harmonicaType", difficulty, genre, music_key as "key",
+               thumbnail_url as "thumbnailUrl", youtube_link as "youtubeLink",
                rejection_reason as "rejectionReason",
                status, view_count as "viewCount", created_at as "createdAt", updated_at as "updatedAt"
         FROM harmonica_tabs

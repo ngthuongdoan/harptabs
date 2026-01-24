@@ -90,7 +90,18 @@ export async function GET(request: NextRequest) {
 // POST /api/tabs - Create new tab (pending approval)
 export async function POST(request: NextRequest) {
   try {
-    const { title, holeHistory, noteHistory, harmonicaType, difficulty, key, genre, captchaToken } = await request.json();
+    const {
+      title,
+      holeHistory,
+      noteHistory,
+      harmonicaType,
+      difficulty,
+      key,
+      genre,
+      youtubeLink,
+      thumbnailUrl,
+      captchaToken
+    } = await request.json();
     
     if (!title || typeof title !== 'string') {
       return NextResponse.json({ error: 'Title is required' }, { status: 400 });
@@ -106,6 +117,10 @@ export async function POST(request: NextRequest) {
 
     const normalizedKey = typeof key === 'string' ? key.trim() : '';
     const normalizedGenre = typeof genre === 'string' ? genre.trim() : '';
+    const normalizedYoutubeLink = typeof youtubeLink === 'string' ? youtubeLink.trim() : '';
+    const normalizedThumbnailUrl = typeof thumbnailUrl === 'string' ? thumbnailUrl.trim() : '';
+    const finalYoutubeLink = normalizedYoutubeLink.length > 0 ? normalizedYoutubeLink : null;
+    const finalThumbnailUrl = normalizedThumbnailUrl.length > 0 ? normalizedThumbnailUrl : null;
 
     const isAdmin = isAuthenticated(request);
     if (!isAdmin) {
@@ -158,7 +173,9 @@ export async function POST(request: NextRequest) {
       difficulty,
       normalizedKey,
       normalizedGenre,
-      harmonicaType
+      harmonicaType,
+      finalYoutubeLink,
+      finalThumbnailUrl
     );
     
     return NextResponse.json({ 

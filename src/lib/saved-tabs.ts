@@ -7,6 +7,8 @@ export interface SavedTab {
   difficulty: 'Beginner' | 'Intermediate' | 'Advanced';
   genre: string;
   key: string;
+  thumbnailUrl: string | null;
+  youtubeLink: string | null;
   status: 'draft' | 'pending' | 'approved' | 'rejected';
   rejectionReason: string | null;
   createdAt: Date;
@@ -37,6 +39,8 @@ export class SavedTabsManager {
     difficulty: 'Beginner' | 'Intermediate' | 'Advanced',
     key: string,
     genre: string,
+    youtubeLink?: string | null,
+    thumbnailUrl?: string | null,
     captchaToken?: string | null
   ): Promise<SavedTab | null> {
     try {
@@ -53,6 +57,8 @@ export class SavedTabsManager {
           difficulty,
           key,
           genre,
+          youtubeLink,
+          thumbnailUrl,
           captchaToken,
         }),
       });
@@ -77,7 +83,9 @@ export class SavedTabsManager {
     harmonicaType?: 'diatonic' | 'tremolo',
     difficulty?: 'Beginner' | 'Intermediate' | 'Advanced',
     key?: string,
-    genre?: string
+    genre?: string,
+    youtubeLink?: string | null,
+    thumbnailUrl?: string | null
   ): Promise<SavedTab | null> {
     try {
       const response = await fetch(`/api/tabs/${id}`, {
@@ -93,6 +101,8 @@ export class SavedTabsManager {
           difficulty,
           key,
           genre,
+          youtubeLink,
+          thumbnailUrl,
         }),
       });
       

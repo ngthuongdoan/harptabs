@@ -104,12 +104,14 @@ export default function AdminLogin() {
             />
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleLogin}>
-              Login
-            </Button>
+            <div className="flex flex-col-reverse gap-2 w-full">
+              <Button variant="outline" onClick={() => setDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleLogin}>
+                Login
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
