@@ -104,13 +104,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Difficulty is required' }, { status: 400 });
     }
 
-    if (!key || typeof key !== 'string' || !key.trim()) {
-      return NextResponse.json({ error: 'Key is required' }, { status: 400 });
-    }
-
-    if (!genre || typeof genre !== 'string' || !genre.trim()) {
-      return NextResponse.json({ error: 'Genre is required' }, { status: 400 });
-    }
+    const normalizedKey = typeof key === 'string' ? key.trim() : '';
+    const normalizedGenre = typeof genre === 'string' ? genre.trim() : '';
 
     const isAdmin = isAuthenticated(request);
     if (!isAdmin) {
@@ -129,8 +124,8 @@ export async function POST(request: NextRequest) {
       noteHistory: noteHistory || '',
       harmonicaType,
       difficulty,
-      key: key.trim(),
-      genre: genre.trim()
+      key: normalizedKey,
+      genre: normalizedGenre
     });
 
     const existingTab = await TabsDB.getTabByContentHash(contentHash);
@@ -161,8 +156,8 @@ export async function POST(request: NextRequest) {
       holeHistory || '',
       noteHistory || '',
       difficulty,
-      key.trim(),
-      genre.trim(),
+      normalizedKey,
+      normalizedGenre,
       harmonicaType
     );
     
