@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from '@/hooks/use-toast';
 import { useTabViewTracking } from '@/hooks/use-tab-view-tracking';
 import { useTabManagement } from '@/hooks/use-tab-management';
-import { Eye, Pencil } from 'lucide-react';
+import { Eye, Pencil, Trash } from 'lucide-react';
 import { TabCard } from '@/components/tab-card';
 import { TabViewDialog } from '@/components/tab-view-dialog';
 import { TabEditDialog } from '@/components/tab-edit-dialog';
@@ -30,7 +30,8 @@ export default function ApprovedTabsDisplay({ apiKey }: ApprovedTabsDisplayProps
     handleView,
     handleCloseView,
     handleCloseEdit,
-    saveEdit
+    saveEdit,
+    handleDelete
   } = useTabManagement(apiKey);
 
   useEffect(() => {
@@ -138,10 +139,17 @@ export default function ApprovedTabsDisplay({ apiKey }: ApprovedTabsDisplayProps
           Close
         </Button>
         {apiKey && viewingTab && (
+          <>
+            <Button variant={"destructive"} onClick={() => handleDelete(viewingTab)}>
+              <Trash className="mr-2 h-4 w-4" />
+              Delete
+            </Button>
           <Button variant="default" onClick={() => handleEdit(viewingTab)}>
             <Pencil className="mr-2 h-4 w-4" />
             Edit Tab
           </Button>
+          </>
+
         )}
       </TabViewDialog>
 

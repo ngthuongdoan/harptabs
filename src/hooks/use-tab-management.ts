@@ -24,6 +24,48 @@ export function useTabManagement(apiKey?: string | null) {
     setEditingTab(null);
   }, []);
 
+  const handleDelete = useCallback(async (tab: SavedTab) => {
+    if (!apiKey) {
+      toast({
+        title: "Error",
+        description: "Admin access required to delete tabs.",
+        variant: "destructive"
+      });
+      return;
+    }
+    if (!confirm(`Are you sure you want to delete the tab "${tab.title}"? This action cannot be undone.`)) {
+      return;
+    }
+    try {
+      const response = await fetch(`/api/tabs/${tab.id}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey
+        }
+      });
+
+      if (!response.ok) throw new Error('Failed to delete tab');
+      toast({
+        title: "Deleted",
+        description: `The tab "${tab.title}" has been deleted.`,
+      });
+      if (viewingTab?.id === tab.id) {
+        handleCloseView();
+      }
+      if (editingTab?.id === tab.id) {
+        handleCloseEdit();
+      }
+    }
+    catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to delete the tab.",
+        variant: "destructive"
+      });
+    }
+  }, [apiKey, toast, viewingTab, editingTab, handleCloseView, handleCloseEdit]);
+
   const saveEdit = useCallback(async (
     tabId: string,
     data: {
@@ -87,6 +129,7 @@ export function useTabManagement(apiKey?: string | null) {
     handleView,
     handleCloseView,
     handleCloseEdit,
-    saveEdit
+    saveEdit,
+    handleDelete
   };
 }
