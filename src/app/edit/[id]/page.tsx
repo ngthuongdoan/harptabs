@@ -14,7 +14,7 @@ interface EditPageProps {
 export default async function EditPage({ params }: EditPageProps) {
   const { id } = params;
   await initializeDatabase();
-  const tab = await TabsDB.getTab(id);
+  const tab = await TabsDB.getTab(id, true);
 
   if (!tab) {
     notFound();
