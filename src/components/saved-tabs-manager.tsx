@@ -135,22 +135,21 @@ export default function SavedTabsManagerDialog({
                           <div className="flex gap-2">
                             <Button
                               variant="outline"
-                              size="sm"
+                              size="icon"
                               onClick={() => handleLoad(tab)}
                             >
                               <Download className="h-4 w-4 mr-1" />
-                              Load
                             </Button>
                             <Button
                               variant="outline"
-                              size="sm"
+                              size="icon"
                               onClick={() => handleEdit(tab)}
                             >
                               <Edit className="h-4 w-4" />
                             </Button>
                             <Button
                               variant="destructive"
-                              size="sm"
+                              size="icon"
                               onClick={() => handleDelete(tab)}
                             >
                               <Trash2 className="h-4 w-4" />

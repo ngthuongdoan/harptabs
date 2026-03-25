@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useToast } from '@/hooks/use-toast';
@@ -9,7 +10,6 @@ import { useTabManagement } from '@/hooks/use-tab-management';
 import { Eye, Pencil, Trash } from 'lucide-react';
 import { TabCard } from '@/components/tab-card';
 import { TabViewDialog } from '@/components/tab-view-dialog';
-import { TabEditDialog } from '@/components/tab-edit-dialog';
 import { ResponsiveTabGrid } from '@/components/responsive-tab-grid';
 import { formatDateShort } from '@/lib/tab-utils';
 import type { SavedTab } from '../../lib/db';
@@ -21,16 +21,13 @@ interface ApprovedTabsDisplayProps {
 export default function ApprovedTabsDisplay({ apiKey }: ApprovedTabsDisplayProps) {
   const [tabs, setTabs] = useState<SavedTab[]>([]);
   const [loading, setLoading] = useState(true);
+  const router = useRouter();
   const { toast } = useToast();
   const { trackView } = useTabViewTracking();
   const {
-    editingTab,
     viewingTab,
-    handleEdit,
     handleView,
     handleCloseView,
-    handleCloseEdit,
-    saveEdit,
     handleDelete
   } = useTabManagement(apiKey);
 
@@ -70,19 +67,6 @@ export default function ApprovedTabsDisplay({ apiKey }: ApprovedTabsDisplayProps
             : t
         )
       );
-    }
-  };
-
-  const handleSaveEdit = async (data: Parameters<typeof saveEdit>[1]) => {
-    if (!editingTab) return;
-
-    const updatedTab = await saveEdit(editingTab.id, data);
-    if (updatedTab) {
-      setTabs((prevTabs) => prevTabs.map((tab) => (tab.id === updatedTab.id ? updatedTab : tab)));
-      if (viewingTab?.id === updatedTab.id) {
-        handleView(updatedTab);
-      }
-      handleCloseEdit();
     }
   };
 
@@ -144,7 +128,7 @@ export default function ApprovedTabsDisplay({ apiKey }: ApprovedTabsDisplayProps
               <Trash className="mr-2 h-4 w-4" />
               Delete
             </Button>
-          <Button variant="default" onClick={() => handleEdit(viewingTab)}>
+          <Button variant="default" onClick={() => router.push(`/edit/${viewingTab.id}`)}>
             <Pencil className="mr-2 h-4 w-4" />
             Edit Tab
           </Button>
@@ -153,19 +137,7 @@ export default function ApprovedTabsDisplay({ apiKey }: ApprovedTabsDisplayProps
         )}
       </TabViewDialog>
 
-      {editingTab && (
-        <TabEditDialog
-          open={!!editingTab}
-          onOpenChange={(open) => !open && handleCloseEdit()}
-          title={editingTab.title}
-          holeHistory={editingTab.holeHistory}
-          noteHistory={editingTab.noteHistory}
-          harmonicaType={editingTab.harmonicaType}
-          onSave={handleSaveEdit}
-          dialogTitle="Edit Approved Tab"
-          dialogDescription="Update the title or contents to correct the public tab."
-        />
-      )}
+
     </div>
   );
 }

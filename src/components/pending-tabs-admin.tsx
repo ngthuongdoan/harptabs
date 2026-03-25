@@ -5,12 +5,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { useTabManagement } from '@/hooks/use-tab-management';
 import { Check, X, Eye, Pencil } from 'lucide-react';
 import { TabCard } from '@/components/tab-card';
 import { TabViewDialog } from '@/components/tab-view-dialog';
-import { TabEditDialog } from '@/components/tab-edit-dialog';
 import { ResponsiveTabGrid } from '@/components/responsive-tab-grid';
 import { formatDate } from '@/lib/tab-utils';
 import {
@@ -36,15 +36,12 @@ export default function PendingTabsAdmin({ apiKey }: PendingTabsAdminProps) {
   const [actionType, setActionType] = useState<'approve' | 'reject' | null>(null);
   const [actionTab, setActionTab] = useState<SavedTab | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
+  const router = useRouter();
   const { toast } = useToast();
   const {
-    editingTab,
     viewingTab,
-    handleEdit,
     handleView,
     handleCloseView,
-    handleCloseEdit,
-    saveEdit
   } = useTabManagement(apiKey);
 
   useEffect(() => {
@@ -88,19 +85,6 @@ export default function PendingTabsAdmin({ apiKey }: PendingTabsAdminProps) {
 
   const handleViewTab = (tab: SavedTab) => {
     handleView(tab);
-  };
-
-  const handleSaveEdit = async (data: Parameters<typeof saveEdit>[1]) => {
-    if (!editingTab) return;
-
-    const updatedTab = await saveEdit(editingTab.id, data);
-    if (updatedTab) {
-      setTabs((prevTabs) => prevTabs.map((tab) => (tab.id === updatedTab.id ? updatedTab : tab)));
-      if (viewingTab?.id === updatedTab.id) {
-        handleView(updatedTab);
-      }
-      handleCloseEdit();
-    }
   };
 
   const confirmAction = async () => {
@@ -210,30 +194,27 @@ export default function PendingTabsAdmin({ apiKey }: PendingTabsAdminProps) {
               <div className="flex flex-col sm:flex-row gap-2">
                 <Button
                   variant="outline"
-                  size="sm"
+                  size="icon"
                   className="flex-1"
                   onClick={() => handleViewTab(tab)}
                 >
                   <Eye className="h-4 w-4 mr-2" />
-                  View
                 </Button>
                 <Button
                   variant="destructive"
-                  size="sm"
+                  size="icon"
                   className="flex-1 sm:flex-initial"
                   onClick={() => handleReject(tab)}
                 >
                   <X className="h-4 w-4 mr-2" />
-                  Reject
                 </Button>
                 <Button
                   variant="default"
-                  size="sm"
+                  size="icon"
                   className="flex-1 sm:flex-initial"
                   onClick={() => handleApprove(tab)}
                 >
                   <Check className="h-4 w-4 mr-2" />
-                  Approve
                 </Button>
               </div>
             </TabCard>
@@ -253,35 +234,18 @@ export default function PendingTabsAdmin({ apiKey }: PendingTabsAdminProps) {
         </Button>
         {viewingTab && (
           <>
-            <Button variant="default" onClick={() => handleEdit(viewingTab)}>
+            <Button variant="default" size="icon" onClick={() => router.push(`/edit/${viewingTab.id}`)}>
               <Pencil className="mr-2 h-4 w-4" />
-              Edit Tab
             </Button>
-            <Button variant="destructive" onClick={() => handleReject(viewingTab)}>
+            <Button variant="destructive" size="icon" onClick={() => handleReject(viewingTab)}>
               <X className="h-4 w-4 mr-2" />
-              Reject
             </Button>
-            <Button variant="default" onClick={() => handleApprove(viewingTab)}>
+            <Button variant="default" size="icon" onClick={() => handleApprove(viewingTab)}>
               <Check className="h-4 w-4 mr-2" />
-              Approve
             </Button>
           </>
         )}
       </TabViewDialog>
-
-      {editingTab && (
-        <TabEditDialog
-          open={!!editingTab}
-          onOpenChange={(open) => !open && handleCloseEdit()}
-          title={editingTab.title}
-          holeHistory={editingTab.holeHistory}
-          noteHistory={editingTab.noteHistory}
-          harmonicaType={editingTab.harmonicaType}
-          onSave={handleSaveEdit}
-          dialogTitle="Edit Pending Tab"
-          dialogDescription="Update the title or contents before approving."
-        />
-      )}
 
       <AlertDialog open={actionDialogOpen} onOpenChange={setActionDialogOpen}>
         <AlertDialogContent className="max-w-full sm:max-w-lg">
