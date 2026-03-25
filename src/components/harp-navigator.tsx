@@ -1,16 +1,7 @@
 
 "use client";
 
-import { useState, useMemo, useCallback, useRef } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import HarmonicaDiagram from './harmonica-diagram';
-import { getHarmonicaLayout, type Note, type HoleAction, type HarmonicaType, isDiatonicLayout, isTremoloLayout, convertDiatonicToTremolo, convertTremoloToDiatonic } from '@/lib/harmonica';
-import { Separator } from './ui/separator';
-import { Button } from './ui/button';
-import { CornerDownLeft, Trash2, Delete, Save, FolderOpen, ArrowRightLeft, Clipboard, Undo2, Redo2 } from 'lucide-react';
-import SaveTabDialog from './save-tab-dialog';
-import SavedTabsManagerDialog from './saved-tabs-manager';
-import { useToast } from '@/hooks/use-toast';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Select,
   SelectContent,
@@ -18,13 +9,26 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useToast } from '@/hooks/use-toast';
+import { convertDiatonicToTremolo, convertTremoloToDiatonic, getHarmonicaLayout, type HarmonicaType, type HoleAction, isDiatonicLayout, isTremoloLayout, type Note } from '@/lib/harmonica';
+import type { SavedTab } from '../../lib/db';
+import { ArrowRightLeft, Clipboard, CornerDownLeft, Delete, Redo2, Save, Trash2, Undo2 } from 'lucide-react';
+import { useCallback, useMemo, useRef, useState } from 'react';
+import HarmonicaDiagram from './harmonica-diagram';
+import SaveTabDialog from './save-tab-dialog';
+import { Button } from './ui/button';
+import { Separator } from './ui/separator';
 
-export default function HarpNavigator() {
-  const [harmonicaType, setHarmonicaType] = useState<HarmonicaType>('tremolo');
+interface HarpNavigatorProps {
+  tab?: SavedTab;
+  mode?: 'create' | 'edit';
+}
+export default function HarpNavigator({ tab, mode = "create" }: HarpNavigatorProps) {
+  const [harmonicaType, setHarmonicaType] = useState<HarmonicaType>(tab?.harmonicaType || 'tremolo');
   const [selectedNote, setSelectedNote] = useState<Note | null>(null);
   const [selectedHoleInfo, setSelectedHoleInfo] = useState<{ hole: number; action: HoleAction } | null>(null);
-  const [holeHistory, setHoleHistory] = useState<string>('');
-  const [noteHistory, setNoteHistory] = useState<string>('');
+  const [holeHistory, setHoleHistory] = useState<string>(tab?.holeHistory || '');
+  const [noteHistory, setNoteHistory] = useState<string>(tab?.noteHistory || '');
   const [undoStack, setUndoStack] = useState<Array<{ holeHistory: string; noteHistory: string; harmonicaType: HarmonicaType }>>([]);
   const [redoStack, setRedoStack] = useState<Array<{ holeHistory: string; noteHistory: string; harmonicaType: HarmonicaType }>>([]);
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
@@ -371,8 +375,12 @@ export default function HarpNavigator() {
   return (
     <Card className="w-full shadow-2xl">
       <CardHeader className="text-center">
-        <CardTitle className="text-3xl font-headline">HarpTab Navigator</CardTitle>
-        <CardDescription>Your interactive guide to the harmonica.</CardDescription>
+        <CardTitle className="text-3xl font-headline">
+          {mode === 'edit' ? 'Edit Tab' : 'HarpTab Navigator'}
+        </CardTitle>
+        <CardDescription>
+          {mode === 'edit' ? `Editing: ${tab?.title ?? 'tab'}` : 'Your interactive guide to the harmonica.'}
+        </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-6">
         <div className="flex flex-col items-center gap-3">
@@ -513,6 +521,15 @@ export default function HarpNavigator() {
         holeHistory={holeHistory}
         noteHistory={noteHistory}
         harmonicaType={harmonicaType}
+        editingTab={mode === 'edit' && tab ? {
+          id: tab.id,
+          title: tab.title,
+          difficulty: tab.difficulty,
+          genre: tab.genre,
+          key: tab.key,
+          harmonicaType: tab.harmonicaType,
+          youtubeLink: tab.youtubeLink,
+        } : null}
       />
       {/*
       <SavedTabsManagerDialog
