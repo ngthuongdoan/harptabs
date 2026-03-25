@@ -34,7 +34,7 @@ export function TabCard({
 
   return (
     <Card
-      className={`overflow-hidden rounded-2xl border border-slate-200/70 dark:border-white/5 bg-white/90 dark:bg-card relative ${onClick && !previewMode ? 'cursor-pointer hover:shadow-xl transition-shadow' : ''} ${className}`}
+      className={`overflow-hidden rounded-2xl border border-slate-200/70 dark:border-white/5 bg-white/90 dark:bg-card relative min-h-[22rem] ${onClick && !previewMode ? 'cursor-pointer hover:shadow-xl transition-shadow' : ''} ${className}`}
       onClick={onClick && !previewMode ? () => onClick(tab) : undefined}
     >
       <div className="relative h-40 sm:h-48 w-full bg-slate-100 dark:bg-slate-800">
