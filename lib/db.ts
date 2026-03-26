@@ -285,21 +285,21 @@ export class TabsDB {
       const data = includeAll
         ? await sql`
             SELECT id, title, hole_history as "holeHistory", note_history as "noteHistory", 
-                   harmonica_type as "harmonicaType", difficulty, genre, music_key as "key",
-                   thumbnail_url as "thumbnailUrl", youtube_link as "youtubeLink",
-                   rejection_reason as "rejectionReason",
-                   status, view_count as "viewCount", created_at as "createdAt", updated_at as "updatedAt"
+                  harmonica_type as "harmonicaType", difficulty, genre, music_key as "key",
+                  thumbnail_url as "thumbnailUrl", youtube_link as "youtubeLink",
+                  rejection_reason as "rejectionReason",
+                  status, view_count as "viewCount", created_at as "createdAt", updated_at as "updatedAt"
             FROM harmonica_tabs 
-            WHERE id = '${id}'
+            WHERE id = ${id}
           `
         : await sql`
             SELECT id, title, hole_history as "holeHistory", note_history as "noteHistory", 
-                   harmonica_type as "harmonicaType", difficulty, genre, music_key as "key",
-                   thumbnail_url as "thumbnailUrl", youtube_link as "youtubeLink",
-                   rejection_reason as "rejectionReason",
-                   status, view_count as "viewCount", created_at as "createdAt", updated_at as "updatedAt"
+                  harmonica_type as "harmonicaType", difficulty, genre, music_key as "key",
+                  thumbnail_url as "thumbnailUrl", youtube_link as "youtubeLink",
+                  rejection_reason as "rejectionReason",
+                  status, view_count as "viewCount", created_at as "createdAt", updated_at as "updatedAt"
             FROM harmonica_tabs 
-            WHERE id = '${id}' AND status = 'approved'
+            WHERE id = ${id} AND status = 'approved'
           `;
       return data[0] as SavedTab || null;
     } catch (error) {
