@@ -29,11 +29,11 @@ const buildTabDescription = (tab: SavedTab) => {
 };
 
 interface TabPageProps {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }
 
 export async function generateMetadata({ params }: TabPageProps): Promise<Metadata> {
-  const { id } = params;
+  const { id } = await params;
   await initializeDatabase();
   const tab = await TabsDB.getTab(id);
 
@@ -64,7 +64,7 @@ export async function generateMetadata({ params }: TabPageProps): Promise<Metada
 }
 
 export default async function TabDetailPage({ params }: TabPageProps) {
-  const { id } = params;
+  const { id } = await params;
   await initializeDatabase();
   const tab = await TabsDB.getTab(id);
 

@@ -8,11 +8,11 @@ import { TabsDB, initializeDatabase } from "../../../../lib/db";
 export const revalidate = 60;
 
 interface EditPageProps {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }
 
 export default async function EditPage({ params }: EditPageProps) {
-  const { id } = params;
+  const { id } = await params;
   await initializeDatabase();
   const tab = await TabsDB.getTab(id, true);
 
