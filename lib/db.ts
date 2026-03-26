@@ -290,7 +290,7 @@ export class TabsDB {
                    rejection_reason as "rejectionReason",
                    status, view_count as "viewCount", created_at as "createdAt", updated_at as "updatedAt"
             FROM harmonica_tabs 
-            WHERE id = ${id}
+            WHERE id = '${id}'
           `
         : await sql`
             SELECT id, title, hole_history as "holeHistory", note_history as "noteHistory", 
@@ -299,7 +299,7 @@ export class TabsDB {
                    rejection_reason as "rejectionReason",
                    status, view_count as "viewCount", created_at as "createdAt", updated_at as "updatedAt"
             FROM harmonica_tabs 
-            WHERE id = ${id} AND status = 'approved'
+            WHERE id = '${id}' AND status = 'approved'
           `;
       return data[0] as SavedTab || null;
     } catch (error) {
