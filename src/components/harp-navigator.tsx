@@ -18,6 +18,7 @@ import HarmonicaDiagram from './harmonica-diagram';
 import SaveTabDialog from './save-tab-dialog';
 import { Button } from './ui/button';
 import { Separator } from './ui/separator';
+import { Textarea } from './ui/textarea';
 
 interface HarpNavigatorProps {
   tab?: SavedTab;
@@ -37,9 +38,7 @@ export default function HarpNavigator({ tab, mode = "create" }: HarpNavigatorPro
 
   const layout = useMemo(() => getHarmonicaLayout(harmonicaType), [harmonicaType]);
   const processingRef = useRef(false);
-  const holeScrollRef = useRef<HTMLDivElement>(null);
-  const noteScrollRef = useRef<HTMLDivElement>(null);
-  const isSyncingScroll = useRef(false);
+  const holeTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   const getCurrentState = useCallback(() => ({
     holeHistory,
@@ -77,30 +76,186 @@ export default function HarpNavigator({ tab, mode = "create" }: HarpNavigatorPro
     return prev.slice(0, lastSpaceIndex);
   };
 
-  const handleNewLine = () => {
-    if (holeHistory || noteHistory) {
-      applyEdit({
-        holeHistory: `${holeHistory}\n`,
-        noteHistory: `${noteHistory}\n`,
-        harmonicaType
-      });
+  const insertTokenAtCursor = useCallback((value: string, token: string) => {
+    const textarea = holeTextareaRef.current;
+
+    if (!textarea) {
+      return appendToken(value, token);
     }
+
+    const selectionStart = textarea.selectionStart ?? value.length;
+    const selectionEnd = textarea.selectionEnd ?? value.length;
+    const before = value.slice(0, selectionStart);
+    const after = value.slice(selectionEnd);
+
+    const needsLeadingSpace = before.length > 0 && !before.endsWith(' ') && !before.endsWith('\n');
+    const needsTrailingSpace = after.length > 0 && !after.startsWith(' ') && !after.startsWith('\n');
+    const insertedToken = `${needsLeadingSpace ? ' ' : ''}${token}${needsTrailingSpace ? ' ' : ''}`;
+
+    return {
+      nextValue: `${before}${insertedToken}${after}`,
+      nextCursor: before.length + insertedToken.length,
+    };
+  }, []);
+
+  const focusHoleTextarea = useCallback((cursorStart: number, cursorEnd = cursorStart) => {
+    requestAnimationFrame(() => {
+      if (!holeTextareaRef.current) return;
+      holeTextareaRef.current.focus();
+      holeTextareaRef.current.setSelectionRange(cursorStart, cursorEnd);
+    });
+  }, []);
+
+  const insertTextAtCursor = useCallback((value: string, text: string) => {
+    const textarea = holeTextareaRef.current;
+
+    if (!textarea) {
+      return {
+        nextValue: `${value}${text}`,
+        nextCursor: value.length + text.length,
+      };
+    }
+
+    const selectionStart = textarea.selectionStart ?? value.length;
+    const selectionEnd = textarea.selectionEnd ?? value.length;
+    const nextValue = `${value.slice(0, selectionStart)}${text}${value.slice(selectionEnd)}`;
+    const nextCursor = selectionStart + text.length;
+
+    return { nextValue, nextCursor };
+  }, []);
+
+  const removePreviousTokenAtCursor = useCallback((value: string) => {
+    const textarea = holeTextareaRef.current;
+
+    if (!textarea) {
+      const nextValue = removeLastEntry(value);
+      return {
+        nextValue,
+        nextCursor: nextValue.length,
+      };
+    }
+
+    const selectionStart = textarea.selectionStart ?? value.length;
+    const selectionEnd = textarea.selectionEnd ?? value.length;
+
+    if (selectionStart !== selectionEnd) {
+      return {
+        nextValue: `${value.slice(0, selectionStart)}${value.slice(selectionEnd)}`,
+        nextCursor: selectionStart,
+      };
+    }
+
+    if (selectionStart === 0) {
+      return {
+        nextValue: value,
+        nextCursor: 0,
+      };
+    }
+
+    const beforeCursor = value.slice(0, selectionStart);
+    const afterCursor = value.slice(selectionStart);
+
+    if (beforeCursor.endsWith('\n')) {
+      return {
+        nextValue: `${beforeCursor.slice(0, -1)}${afterCursor}`,
+        nextCursor: selectionStart - 1,
+      };
+    }
+
+    const beforeWithoutTrailingSpaces = beforeCursor.replace(/[ \t]+$/, '');
+    const lastTokenMatch = beforeWithoutTrailingSpaces.match(/\S+$/);
+
+    if (!lastTokenMatch) {
+      return {
+        nextValue: `${beforeWithoutTrailingSpaces}${afterCursor}`,
+        nextCursor: beforeWithoutTrailingSpaces.length,
+      };
+    }
+
+    const tokenStart = beforeWithoutTrailingSpaces.length - lastTokenMatch[0].length;
+    const separatorMatch = beforeWithoutTrailingSpaces.slice(0, tokenStart).match(/[ \t]+$/);
+    const rangeStart = separatorMatch ? tokenStart - separatorMatch[0].length : tokenStart;
+
+    return {
+      nextValue: `${value.slice(0, rangeStart)}${afterCursor}`,
+      nextCursor: rangeStart,
+    };
+  }, []);
+
+  const getInvalidHoleTokens = useCallback((text: string) => {
+    const invalidTokens: string[] = [];
+
+    for (const line of text.split('\n')) {
+      const tokens = line.trim().split(/\s+/).filter(Boolean);
+
+      for (const token of tokens) {
+        if (isDiatonicLayout(layout)) {
+          const match = token.match(/^([+-])(\d+)$/);
+          if (!match) {
+            invalidTokens.push(token);
+            continue;
+          }
+
+          const hole = parseInt(match[2], 10);
+          if (!layout[hole]) {
+            invalidTokens.push(token);
+          }
+          continue;
+        }
+
+        if (isTremoloLayout(layout)) {
+          if (!/^\d+$/.test(token)) {
+            invalidTokens.push(token);
+            continue;
+          }
+
+          const hole = parseInt(token, 10);
+          if (!layout[hole]) {
+            invalidTokens.push(token);
+          }
+        }
+      }
+    }
+
+    return invalidTokens;
+  }, [layout]);
+
+  const invalidHoleTokens = useMemo(
+    () => getInvalidHoleTokens(holeHistory),
+    [getInvalidHoleTokens, holeHistory]
+  );
+
+  const handleNewLine = () => {
+    const insertion = insertTextAtCursor(holeHistory, '\n');
+
+    applyEdit({
+      holeHistory: insertion.nextValue,
+      noteHistory: convertHoleToNotes(insertion.nextValue),
+      harmonicaType
+    });
+
+    focusHoleTextarea(insertion.nextCursor);
   };
 
   const handleBackspace = () => {
+    const removal = removePreviousTokenAtCursor(holeHistory);
+
+    if (removal.nextValue === holeHistory) {
+      return;
+    }
+
     applyEdit({
-      holeHistory: removeLastEntry(holeHistory),
-      noteHistory: removeLastEntry(noteHistory),
+      holeHistory: removal.nextValue,
+      noteHistory: convertHoleToNotes(removal.nextValue),
       harmonicaType
     });
+
+    focusHoleTextarea(removal.nextCursor);
   };
 
   const handleHoleSelect = useCallback((hole: number, action: HoleAction) => {
-    console.log('handleHoleSelect called:', hole, action);
-
     // Prevent multiple rapid calls
     if (processingRef.current) {
-      console.log('Call blocked - processing');
       return;
     }
 
@@ -125,18 +280,25 @@ export default function HarpNavigator({ tab, mode = "create" }: HarpNavigatorPro
     setSelectedHoleInfo({ hole, action });
     setSelectedNote(note || null);
     if (note) {
+      const insertion = insertTokenAtCursor(holeHistory, holeNotation);
+      const nextHoleHistory = typeof insertion === 'string' ? insertion : insertion.nextValue;
+
       applyEdit({
-        holeHistory: appendToken(holeHistory, holeNotation),
-        noteHistory: appendToken(noteHistory, note),
+        holeHistory: nextHoleHistory,
+        noteHistory: convertHoleToNotes(nextHoleHistory),
         harmonicaType
       });
+
+      if (typeof insertion !== 'string') {
+        focusHoleTextarea(insertion.nextCursor);
+      }
     }
 
     // Reset the flag after a short delay
     setTimeout(() => {
       processingRef.current = false;
     }, 50);
-  }, [layout, applyEdit, holeHistory, noteHistory, harmonicaType]);
+  }, [layout, applyEdit, convertHoleToNotes, focusHoleTextarea, holeHistory, harmonicaType, insertTokenAtCursor]);
 
 
 
@@ -144,6 +306,22 @@ export default function HarpNavigator({ tab, mode = "create" }: HarpNavigatorPro
     applyEdit({
       holeHistory: '',
       noteHistory: '',
+      harmonicaType
+    });
+  };
+
+  const handleHoleHistoryChange = (value: string) => {
+    applyEdit({
+      holeHistory: value,
+      noteHistory: convertHoleToNotes(value),
+      harmonicaType
+    });
+  };
+
+  const handleNoteHistoryChange = (value: string) => {
+    applyEdit({
+      holeHistory,
+      noteHistory: value,
       harmonicaType
     });
   };
@@ -276,7 +454,7 @@ export default function HarpNavigator({ tab, mode = "create" }: HarpNavigatorPro
     }
   };
 
-  const convertHoleToNotes = (holeText: string): string => {
+  function convertHoleToNotes(holeText: string): string {
     const lines = holeText.split('\n');
     const noteLines = lines.map(line => {
       const tokens = line.split(/\s+/);
@@ -314,7 +492,7 @@ export default function HarpNavigator({ tab, mode = "create" }: HarpNavigatorPro
       return notes.join(' ');
     });
     return noteLines.join('\n');
-  };
+  }
 
   const handleLoadTab = (holeHistory: string, noteHistory: string) => {
     applyEdit({
@@ -341,34 +519,6 @@ export default function HarpNavigator({ tab, mode = "create" }: HarpNavigatorPro
       setUndoStack(next => [...next, getCurrentState()]);
       applyState(nextState);
       return prev.slice(0, -1);
-    });
-  };
-
-  const handleHoleScroll = (e: React.UIEvent<HTMLDivElement>) => {
-    if (isSyncingScroll.current) return;
-    isSyncingScroll.current = true;
-
-    if (noteScrollRef.current) {
-      noteScrollRef.current.scrollTop = e.currentTarget.scrollTop;
-      noteScrollRef.current.scrollLeft = e.currentTarget.scrollLeft;
-    }
-
-    requestAnimationFrame(() => {
-      isSyncingScroll.current = false;
-    });
-  };
-
-  const handleNoteScroll = (e: React.UIEvent<HTMLDivElement>) => {
-    if (isSyncingScroll.current) return;
-    isSyncingScroll.current = true;
-
-    if (holeScrollRef.current) {
-      holeScrollRef.current.scrollTop = e.currentTarget.scrollTop;
-      holeScrollRef.current.scrollLeft = e.currentTarget.scrollLeft;
-    }
-
-    requestAnimationFrame(() => {
-      isSyncingScroll.current = false;
     });
   };
 
@@ -462,31 +612,33 @@ export default function HarpNavigator({ tab, mode = "create" }: HarpNavigatorPro
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
                 <div>
                   <h3 className="font-semibold text-sm uppercase text-muted-foreground tracking-wider mb-2">Hole Numbers</h3>
-                  <div
-                    ref={holeScrollRef}
-                    onScroll={handleHoleScroll}
-                    className="p-4 bg-background/50 rounded-lg min-h-[60px] max-h-[200px] text-base md:text-lg font-mono overflow-y-auto"
-                  >
-                    {!holeHistory ? (
-                      <p className="text-muted-foreground text-sm">Hole numbers will appear here.</p>
-                    ) : (
-                      <pre className="break-words whitespace-pre-wrap">{holeHistory}</pre>
-                    )}
-                  </div>
+                  <Textarea
+                    ref={holeTextareaRef}
+                    value={holeHistory}
+                    onChange={(event) => handleHoleHistoryChange(event.target.value)}
+                    placeholder={harmonicaType === 'diatonic' ? '+4 -4 +5' : '3 4 5'}
+                    className="min-h-[180px] resize-y bg-background/50 font-mono text-sm md:text-base"
+                  />
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Edit the tab directly or keep using the harmonica diagram. Hole notation is the main synced source.
+                  </p>
+                  {invalidHoleTokens.length > 0 && (
+                    <p className="mt-2 text-xs text-destructive">
+                      Invalid tokens: {invalidHoleTokens.join(', ')}
+                    </p>
+                  )}
                 </div>
                 <div>
                   <h3 className="font-semibold text-sm uppercase text-muted-foreground tracking-wider mb-2">Note Letters</h3>
-                  <div
-                    ref={noteScrollRef}
-                    onScroll={handleNoteScroll}
-                    className="p-4 bg-background/50 rounded-lg min-h-[60px] max-h-[200px] text-base md:text-lg font-mono overflow-y-auto"
-                  >
-                    {!noteHistory ? (
-                      <p className="text-muted-foreground text-sm">Note letters will appear here.</p>
-                    ) : (
-                      <pre className="break-words whitespace-pre-wrap">{noteHistory}</pre>
-                    )}
-                  </div>
+                  <Textarea
+                    value={noteHistory}
+                    onChange={(event) => handleNoteHistoryChange(event.target.value)}
+                    placeholder="C5 D5 E5"
+                    className="min-h-[180px] resize-y bg-background/50 font-mono text-sm md:text-base"
+                  />
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Notes sync when hole notation changes, and can also be adjusted directly as plain text.
+                  </p>
                 </div>
               </div>
             </CardContent>
