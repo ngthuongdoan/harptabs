@@ -57,6 +57,7 @@ export function TabViewDialog({
   showDetailedErrors = false
 }: TabViewDialogProps) {
   const [viewHarmonicaType, setViewHarmonicaType] = useState<HarmonicaType | null>(null);
+  const [viewMode, setViewMode] = useState<"simple" | "detail">("simple");
   const [alertDialog, setAlertDialog] = useState<{
     title: string;
     description: string;
@@ -72,6 +73,7 @@ export function TabViewDialog({
   const handleOpenChange = (newOpen: boolean) => {
     if (!newOpen) {
       setViewHarmonicaType(null);
+      setViewMode("simple");
     }
     onOpenChange(newOpen);
   };
@@ -115,6 +117,21 @@ export function TabViewDialog({
                           onClick={() => setViewHarmonicaType("tremolo")}
                         >
                           Tremolo
+                        </Button>
+                        <span className="ml-2 text-xs md:text-sm text-muted-foreground">Mode:</span>
+                        <Button
+                          variant={viewMode === "simple" ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setViewMode("simple")}
+                        >
+                          Simple
+                        </Button>
+                        <Button
+                          variant={viewMode === "detail" ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setViewMode("detail")}
+                        >
+                          Detail
                         </Button>
                         {activeViewType !== tab.harmonicaType && (
                           <Badge variant="secondary">Converted</Badge>
@@ -225,7 +242,9 @@ export function TabViewDialog({
                     <TabContentView
                       holeHistory={displayData.holeHistory}
                       noteHistory={tab.noteHistory}
+                      lyrics={tab.lyrics}
                       height="h-96"
+                      viewMode={viewMode}
                     />
                   </>
                 )}

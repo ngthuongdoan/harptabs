@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, Eye } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { TabContentView } from "@/components/tabs/display/tab-content-view";
+import { TabContentPanel } from "@/components/tabs/display/tab-content-panel";
 import { TabTypeBadge } from "@/components/tabs/display/tab-card";
 import TabViewTracker from "@/components/tabs/display/tab-view-tracker";
 import { formatDateShort } from "@/lib/tab-utils";
@@ -97,9 +97,10 @@ export default async function TabDetailPage({ params }: TabPageProps) {
           </div>
         </div>
 
-        <TabContentView
+        <TabContentPanel
           holeHistory={tab.holeHistory}
           noteHistory={tab.noteHistory}
+          lyrics={tab.lyrics}
           height="h-72"
         />
 

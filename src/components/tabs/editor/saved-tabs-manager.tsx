@@ -29,7 +29,7 @@ import SaveTabDialog from '@/components/tabs/editor/save-tab-dialog';
 interface SavedTabsManagerProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onLoadTab: (holeHistory: string, noteHistory: string) => void;
+  onLoadTab: (holeHistory: string, noteHistory: string, lyrics: string) => void;
 }
 
 export default function SavedTabsManagerDialog({
@@ -86,7 +86,7 @@ export default function SavedTabsManagerDialog({
   };
 
   const handleLoad = (tab: SavedTab) => {
-    onLoadTab(tab.holeHistory, tab.noteHistory);
+    onLoadTab(tab.holeHistory, tab.noteHistory, tab.lyrics);
     onOpenChange(false);
     toast({
       title: "Success",
@@ -181,6 +181,14 @@ export default function SavedTabsManagerDialog({
                               {tab.noteHistory || '(empty)'}
                             </div>
                           </div>
+                          {tab.lyrics && (
+                            <div>
+                              <p className="text-sm font-medium text-muted-foreground mb-1">Lyrics:</p>
+                              <div className="p-2 bg-muted rounded text-sm max-h-16 overflow-y-auto whitespace-pre-wrap">
+                                {tab.lyrics}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </CardContent>
                     </Card>
@@ -217,10 +225,12 @@ export default function SavedTabsManagerDialog({
           }}
           holeHistory={selectedTab.holeHistory}
           noteHistory={selectedTab.noteHistory}
+          lyrics={selectedTab.lyrics}
           harmonicaType={selectedTab.harmonicaType}
           editingTab={{
             id: selectedTab.id,
             title: selectedTab.title,
+            lyrics: selectedTab.lyrics,
             difficulty: selectedTab.difficulty,
             genre: selectedTab.genre,
             key: selectedTab.key,

@@ -41,10 +41,12 @@ interface SaveTabDialogProps {
   onOpenChange: (open: boolean) => void;
   holeHistory: string;
   noteHistory: string;
+  lyrics: string;
   harmonicaType: HarmonicaType;
   editingTab?: {
     id: string;
     title: string;
+    lyrics: string;
     difficulty: 'Beginner' | 'Intermediate' | 'Advanced';
     genre: string;
     key: string;
@@ -58,6 +60,7 @@ export default function SaveTabDialog({
   onOpenChange,
   holeHistory,
   noteHistory,
+  lyrics,
   harmonicaType,
   editingTab
 }: SaveTabDialogProps) {
@@ -149,6 +152,7 @@ export default function SaveTabDialog({
             value.musicTitle.trim(),
             holeHistory,
             noteHistory,
+            lyrics,
             value.harmonicaType,
             value.difficulty,
             '',
@@ -161,6 +165,7 @@ export default function SaveTabDialog({
             value.musicTitle.trim(),
             holeHistory,
             noteHistory,
+            lyrics,
             value.harmonicaType,
             value.difficulty,
             '',

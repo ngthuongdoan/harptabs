@@ -12,7 +12,7 @@ export class BatchTabsDB {
   /**
    * Create multiple tabs in a single transaction
    */
-  static async createMultipleTabs(tabs: Array<{title: string, holeHistory: string, noteHistory: string}>): Promise<SavedTab[]> {
+  static async createMultipleTabs(tabs: Array<{title: string, holeHistory: string, noteHistory: string, lyrics?: string}>): Promise<SavedTab[]> {
     try {
       const results: SavedTab[] = [];
       
@@ -21,6 +21,7 @@ export class BatchTabsDB {
           tab.title,
           tab.holeHistory,
           tab.noteHistory,
+          tab.lyrics ?? "",
           "Beginner",
           "C",
           "Unknown"
@@ -38,12 +39,12 @@ export class BatchTabsDB {
   /**
    * Update multiple tabs by IDs
    */
-  static async updateMultipleTabs(updates: Array<{id: string, title: string, holeHistory: string, noteHistory: string}>): Promise<(SavedTab | null)[]> {
+  static async updateMultipleTabs(updates: Array<{id: string, title: string, holeHistory: string, noteHistory: string, lyrics?: string}>): Promise<(SavedTab | null)[]> {
     try {
       const results: (SavedTab | null)[] = [];
       
       for (const update of updates) {
-        const result = await TabsDB.updateTab(update.id, update.title, update.holeHistory, update.noteHistory);
+        const result = await TabsDB.updateTab(update.id, update.title, update.holeHistory, update.noteHistory, update.lyrics ?? "");
         results.push(result);
       }
       
@@ -131,7 +132,8 @@ export class AdvancedTabsDB {
           : "ORDER BY created_at DESC";
 
       const tabsQuery = `
-        SELECT id, title, hole_history as "holeHistory", note_history as "noteHistory", 
+        SELECT id, title, hole_history as "holeHistory", note_history as "noteHistory",
+               lyrics,
                harmonica_type as "harmonicaType", difficulty, genre, music_key as "key",
                thumbnail_url as "thumbnailUrl", youtube_link as "youtubeLink",
                rejection_reason as "rejectionReason",
@@ -181,7 +183,8 @@ export class AdvancedTabsDB {
   }, includeAll: boolean = false): Promise<SavedTab[]> {
     try {
       let query = `
-        SELECT id, title, hole_history as "holeHistory", note_history as "noteHistory", 
+        SELECT id, title, hole_history as "holeHistory", note_history as "noteHistory",
+               lyrics,
                harmonica_type as "harmonicaType", difficulty, genre, music_key as "key",
                thumbnail_url as "thumbnailUrl", youtube_link as "youtubeLink",
                rejection_reason as "rejectionReason",
@@ -223,7 +226,9 @@ export class AdvancedTabsDB {
 
       query += ` ORDER BY updated_at DESC`;
 
-      const data = await sql(query, ...params);
+      const data = await (sql as unknown as {
+        query: (queryText: string, params?: unknown[]) => Promise<unknown[]>;
+      }).query(query, params);
       return data as SavedTab[];
     } catch (error) {
       console.error('Error searching tabs:', error);
@@ -286,6 +291,7 @@ export class TabsDBExamples {
         "My First Harmonica Tab",
         "1 2 3 4 5",
         "C D E F G",
+        "When the saints",
         "Beginner",
         "C",
         "Folk"
@@ -335,7 +341,8 @@ export class TabsDBExamples {
         id,
         "Updated Tab Title",
         "1 2 3 4 5 6",
-        "C D E F G A"
+        "C D E F G A",
+        "Updated lyric line"
       );
       console.log('Updated tab:', updatedTab);
       return updatedTab;

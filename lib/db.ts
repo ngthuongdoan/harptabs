@@ -13,6 +13,7 @@ export interface SavedTab {
   title: string;
   holeHistory: string;
   noteHistory: string;
+  lyrics: string;
   harmonicaType: 'diatonic' | 'tremolo';
   difficulty: 'Beginner' | 'Intermediate' | 'Advanced';
   genre: string;
@@ -40,6 +41,7 @@ export function buildTabContentHash(params: {
   title: string;
   holeHistory: string;
   noteHistory: string;
+  lyrics: string;
   harmonicaType: 'diatonic' | 'tremolo';
   difficulty: 'Beginner' | 'Intermediate' | 'Advanced';
   key: string;
@@ -49,6 +51,7 @@ export function buildTabContentHash(params: {
     title: normalizeTabField(params.title),
     holeHistory: normalizeTabField(params.holeHistory),
     noteHistory: normalizeTabField(params.noteHistory),
+    lyrics: normalizeTabField(params.lyrics),
     harmonicaType: params.harmonicaType,
     difficulty: params.difficulty,
     key: normalizeTabField(params.key).toLowerCase(),
@@ -96,6 +99,7 @@ export async function initializeDatabase() {
         title VARCHAR(500) NOT NULL,
         hole_history TEXT DEFAULT '',
         note_history TEXT DEFAULT '',
+        lyrics TEXT DEFAULT '',
         harmonica_type VARCHAR(20) DEFAULT 'diatonic',
         difficulty VARCHAR(50) DEFAULT 'Beginner',
         genre VARCHAR(100) DEFAULT '',
@@ -134,6 +138,11 @@ export async function initializeDatabase() {
         await sql`
       ALTER TABLE harmonica_tabs 
       ADD COLUMN IF NOT EXISTS music_key VARCHAR(50) DEFAULT ''
+    `;
+
+        await sql`
+      ALTER TABLE harmonica_tabs
+      ADD COLUMN IF NOT EXISTS lyrics TEXT DEFAULT ''
     `;
 
         await sql`
@@ -214,7 +223,7 @@ export async function initializeDatabase() {
         }
 
         const tabsMissingHash = await sql`
-      SELECT id, title, hole_history, note_history, harmonica_type, difficulty, genre, music_key
+      SELECT id, title, hole_history, note_history, lyrics, harmonica_type, difficulty, genre, music_key
       FROM harmonica_tabs
       WHERE content_hash IS NULL OR content_hash = ''
     `;
@@ -224,6 +233,7 @@ export async function initializeDatabase() {
             title: tab.title,
             holeHistory: tab.hole_history ?? "",
             noteHistory: tab.note_history ?? "",
+            lyrics: tab.lyrics ?? "",
             harmonicaType: tab.harmonica_type ?? "diatonic",
             difficulty: tab.difficulty ?? "Beginner",
             key: tab.music_key ?? "",
@@ -290,7 +300,8 @@ export class TabsDB {
     try {
       const data = includeAll
         ? await sql`
-            SELECT id, title, hole_history as "holeHistory", note_history as "noteHistory", 
+            SELECT id, title, hole_history as "holeHistory", note_history as "noteHistory",
+                   lyrics,
                    harmonica_type as "harmonicaType", difficulty, genre, music_key as "key",
                    thumbnail_url as "thumbnailUrl", youtube_link as "youtubeLink",
                    rejection_reason as "rejectionReason",
@@ -300,7 +311,8 @@ export class TabsDB {
             LIMIT ${limit} OFFSET ${offset}
           `
         : await sql`
-            SELECT id, title, hole_history as "holeHistory", note_history as "noteHistory", 
+            SELECT id, title, hole_history as "holeHistory", note_history as "noteHistory",
+                   lyrics,
                    harmonica_type as "harmonicaType", difficulty, genre, music_key as "key",
                    thumbnail_url as "thumbnailUrl", youtube_link as "youtubeLink",
                    rejection_reason as "rejectionReason",
@@ -321,7 +333,8 @@ export class TabsDB {
     try {
       const data = includeAll
         ? await sql`
-            SELECT id, title, hole_history as "holeHistory", note_history as "noteHistory", 
+            SELECT id, title, hole_history as "holeHistory", note_history as "noteHistory",
+                  lyrics,
                   harmonica_type as "harmonicaType", difficulty, genre, music_key as "key",
                   thumbnail_url as "thumbnailUrl", youtube_link as "youtubeLink",
                   rejection_reason as "rejectionReason",
@@ -330,7 +343,8 @@ export class TabsDB {
             WHERE id = ${id}
           `
         : await sql`
-            SELECT id, title, hole_history as "holeHistory", note_history as "noteHistory", 
+            SELECT id, title, hole_history as "holeHistory", note_history as "noteHistory",
+                  lyrics,
                   harmonica_type as "harmonicaType", difficulty, genre, music_key as "key",
                   thumbnail_url as "thumbnailUrl", youtube_link as "youtubeLink",
                   rejection_reason as "rejectionReason",
@@ -349,6 +363,7 @@ export class TabsDB {
     title: string,
     holeHistory: string,
     noteHistory: string,
+    lyrics: string,
     difficulty: 'Beginner' | 'Intermediate' | 'Advanced',
     key: string,
     genre: string,
@@ -364,6 +379,7 @@ export class TabsDB {
         title,
         holeHistory,
         noteHistory,
+        lyrics,
         harmonicaType: finalHarmonicaType,
         difficulty,
         key,
@@ -372,15 +388,16 @@ export class TabsDB {
       
       const data = await sql`
         INSERT INTO harmonica_tabs (
-          id, title, hole_history, note_history, harmonica_type, difficulty, genre, music_key,
+          id, title, hole_history, note_history, lyrics, harmonica_type, difficulty, genre, music_key,
           thumbnail_url, youtube_link, status, content_hash, created_at, updated_at
         )
         VALUES (
-          ${id}, ${title}, ${holeHistory}, ${noteHistory}, ${finalHarmonicaType}, ${difficulty}, ${genre}, ${key},
+          ${id}, ${title}, ${holeHistory}, ${noteHistory}, ${lyrics}, ${finalHarmonicaType}, ${difficulty}, ${genre}, ${key},
           ${thumbnailUrl ?? null}, ${youtubeLink ?? null},
           'pending', ${contentHash}, ${now.toISOString()}, ${now.toISOString()}
         )
-        RETURNING id, title, hole_history as "holeHistory", note_history as "noteHistory", 
+        RETURNING id, title, hole_history as "holeHistory", note_history as "noteHistory",
+                  lyrics,
                   harmonica_type as "harmonicaType", difficulty, genre, music_key as "key",
                   thumbnail_url as "thumbnailUrl", youtube_link as "youtubeLink",
                   rejection_reason as "rejectionReason",
@@ -398,6 +415,7 @@ export class TabsDB {
     title: string,
     holeHistory: string,
     noteHistory: string,
+    lyrics: string,
     harmonicaType?: 'diatonic' | 'tremolo',
     difficulty?: 'Beginner' | 'Intermediate' | 'Advanced' | null,
     key?: string | null,
@@ -408,19 +426,32 @@ export class TabsDB {
     try {
       const now = new Date();
       const finalHarmonicaType = harmonicaType || detectHarmonicaType(holeHistory);
+      const contentHash = buildTabContentHash({
+        title,
+        holeHistory,
+        noteHistory,
+        lyrics,
+        harmonicaType: finalHarmonicaType,
+        difficulty: difficulty ?? 'Beginner',
+        key: key ?? '',
+        genre: genre ?? ''
+      });
       
       const data = await sql`
         UPDATE harmonica_tabs 
-        SET title = ${title}, hole_history = ${holeHistory}, note_history = ${noteHistory}, 
+        SET title = ${title}, hole_history = ${holeHistory}, note_history = ${noteHistory},
+            lyrics = ${lyrics},
             harmonica_type = ${finalHarmonicaType},
             difficulty = COALESCE(${difficulty}, difficulty),
             genre = COALESCE(${genre}, genre),
             music_key = COALESCE(${key}, music_key),
             youtube_link = COALESCE(${youtubeLink}, youtube_link),
             thumbnail_url = COALESCE(${thumbnailUrl}, thumbnail_url),
+            content_hash = ${contentHash},
             updated_at = ${now.toISOString()}
         WHERE id = ${id}
-        RETURNING id, title, hole_history as "holeHistory", note_history as "noteHistory", 
+        RETURNING id, title, hole_history as "holeHistory", note_history as "noteHistory",
+                  lyrics,
                   harmonica_type as "harmonicaType", difficulty, genre, music_key as "key",
                   thumbnail_url as "thumbnailUrl", youtube_link as "youtubeLink",
                   rejection_reason as "rejectionReason",
@@ -463,7 +494,8 @@ export class TabsDB {
         UPDATE harmonica_tabs 
         SET status = ${status}, rejection_reason = ${finalRejectionReason}, updated_at = ${now.toISOString()}
         WHERE id = ${id}
-        RETURNING id, title, hole_history as "holeHistory", note_history as "noteHistory", 
+        RETURNING id, title, hole_history as "holeHistory", note_history as "noteHistory",
+                  lyrics,
                   harmonica_type as "harmonicaType", difficulty, genre, music_key as "key",
                   thumbnail_url as "thumbnailUrl", youtube_link as "youtubeLink",
                   rejection_reason as "rejectionReason",
@@ -479,7 +511,8 @@ export class TabsDB {
   static async getPendingTabs(): Promise<SavedTab[]> {
     try {
       const data = await sql`
-        SELECT id, title, hole_history as "holeHistory", note_history as "noteHistory", 
+        SELECT id, title, hole_history as "holeHistory", note_history as "noteHistory",
+               lyrics,
                harmonica_type as "harmonicaType", difficulty, genre, music_key as "key",
                thumbnail_url as "thumbnailUrl", youtube_link as "youtubeLink",
                rejection_reason as "rejectionReason",
@@ -513,7 +546,8 @@ export class TabsDB {
     try {
       const data = includeAll
         ? await sql`
-            SELECT id, title, hole_history as "holeHistory", note_history as "noteHistory", 
+            SELECT id, title, hole_history as "holeHistory", note_history as "noteHistory",
+                   lyrics,
                    harmonica_type as "harmonicaType", difficulty, genre, music_key as "key",
                    thumbnail_url as "thumbnailUrl", youtube_link as "youtubeLink",
                    rejection_reason as "rejectionReason",
@@ -523,7 +557,8 @@ export class TabsDB {
             ORDER BY updated_at DESC
           `
         : await sql`
-            SELECT id, title, hole_history as "holeHistory", note_history as "noteHistory", 
+            SELECT id, title, hole_history as "holeHistory", note_history as "noteHistory",
+                   lyrics,
                    harmonica_type as "harmonicaType", difficulty, genre, music_key as "key",
                    thumbnail_url as "thumbnailUrl", youtube_link as "youtubeLink",
                    rejection_reason as "rejectionReason",
@@ -555,7 +590,8 @@ export class TabsDB {
     try {
       const data = includeAll
         ? await sql`
-            SELECT id, title, hole_history as "holeHistory", note_history as "noteHistory", 
+            SELECT id, title, hole_history as "holeHistory", note_history as "noteHistory",
+                   lyrics,
                    harmonica_type as "harmonicaType", difficulty, genre, music_key as "key",
                    thumbnail_url as "thumbnailUrl", youtube_link as "youtubeLink",
                    rejection_reason as "rejectionReason",
@@ -565,7 +601,8 @@ export class TabsDB {
             LIMIT ${limit}
           `
         : await sql`
-            SELECT id, title, hole_history as "holeHistory", note_history as "noteHistory", 
+            SELECT id, title, hole_history as "holeHistory", note_history as "noteHistory",
+                   lyrics,
                    harmonica_type as "harmonicaType", difficulty, genre, music_key as "key",
                    thumbnail_url as "thumbnailUrl", youtube_link as "youtubeLink",
                    rejection_reason as "rejectionReason",
@@ -600,7 +637,8 @@ export class TabsDB {
         UPDATE harmonica_tabs 
         SET view_count = COALESCE(view_count, 0) + 1
         WHERE id = ${id} AND status = 'approved'
-        RETURNING id, title, hole_history as "holeHistory", note_history as "noteHistory", 
+        RETURNING id, title, hole_history as "holeHistory", note_history as "noteHistory",
+                  lyrics,
                   harmonica_type as "harmonicaType", difficulty, genre, music_key as "key",
                   thumbnail_url as "thumbnailUrl", youtube_link as "youtubeLink",
                   rejection_reason as "rejectionReason",
@@ -616,7 +654,8 @@ export class TabsDB {
   static async getTabByContentHash(hash: string): Promise<SavedTab | null> {
     try {
       const data = await sql`
-        SELECT id, title, hole_history as "holeHistory", note_history as "noteHistory", 
+        SELECT id, title, hole_history as "holeHistory", note_history as "noteHistory",
+               lyrics,
                harmonica_type as "harmonicaType", difficulty, genre, music_key as "key",
                thumbnail_url as "thumbnailUrl", youtube_link as "youtubeLink",
                rejection_reason as "rejectionReason",

@@ -3,6 +3,7 @@ export interface SavedTab {
   title: string;
   holeHistory: string;
   noteHistory: string;
+  lyrics: string;
   harmonicaType: 'diatonic' | 'tremolo';
   difficulty: 'Beginner' | 'Intermediate' | 'Advanced';
   genre: string;
@@ -56,6 +57,7 @@ export class SavedTabsManager {
     title: string,
     holeHistory: string,
     noteHistory: string,
+    lyrics: string,
     harmonicaType: 'diatonic' | 'tremolo',
     difficulty: 'Beginner' | 'Intermediate' | 'Advanced',
     key: string,
@@ -74,6 +76,7 @@ export class SavedTabsManager {
           title,
           holeHistory,
           noteHistory,
+          lyrics,
           harmonicaType,
           difficulty,
           key,
@@ -101,6 +104,7 @@ export class SavedTabsManager {
     title: string,
     holeHistory: string,
     noteHistory: string,
+    lyrics: string,
     harmonicaType?: 'diatonic' | 'tremolo',
     difficulty?: 'Beginner' | 'Intermediate' | 'Advanced',
     key?: string,
@@ -119,6 +123,7 @@ export class SavedTabsManager {
           title,
           holeHistory,
           noteHistory,
+          lyrics,
           harmonicaType,
           difficulty,
           key,

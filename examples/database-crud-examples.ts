@@ -26,7 +26,11 @@ async function createExamples() {
   const tab1 = await TabsDB.createTab(
     "Amazing Grace",
     "4 5 6 6 5 4 4",
-    "C D E E D C C"
+    "C D E E D C C",
+    "A-maz-ing grace",
+    "Beginner",
+    "C",
+    "Traditional"
   );
   console.log('Created tab:', tab1);
 
@@ -34,7 +38,11 @@ async function createExamples() {
   const tab2 = await TabsDB.createTab(
     "Mary Had a Little Lamb",
     "3 2 1 2 3 3 3",
-    "E D C D E E E"
+    "E D C D E E E",
+    "Mary had a little lamb",
+    "Beginner",
+    "C",
+    "Children"
   );
   console.log('Created tab:', tab2);
 
@@ -82,7 +90,8 @@ async function updateExamples(tabs: SavedTab[]) {
       tabToUpdate.id,
       "Amazing Grace (Updated)",
       "4 5 6 6 5 4 4 3",
-      "C D E E D C C B"
+      "C D E E D C C B",
+      "A-maz-ing grace how sweet"
     );
     console.log('Updated tab:', updatedTab);
     

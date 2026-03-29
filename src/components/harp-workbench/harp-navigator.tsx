@@ -30,8 +30,9 @@ export default function HarpNavigator({ tab, mode = "create" }: HarpNavigatorPro
   const [selectedHoleInfo, setSelectedHoleInfo] = useState<{ hole: number; action: HoleAction } | null>(null);
   const [holeHistory, setHoleHistory] = useState<string>(tab?.holeHistory || '');
   const [noteHistory, setNoteHistory] = useState<string>(tab?.noteHistory || '');
-  const [undoStack, setUndoStack] = useState<Array<{ holeHistory: string; noteHistory: string; harmonicaType: HarmonicaType }>>([]);
-  const [redoStack, setRedoStack] = useState<Array<{ holeHistory: string; noteHistory: string; harmonicaType: HarmonicaType }>>([]);
+  const [lyrics, setLyrics] = useState<string>(tab?.lyrics || '');
+  const [undoStack, setUndoStack] = useState<Array<{ holeHistory: string; noteHistory: string; lyrics: string; harmonicaType: HarmonicaType }>>([]);
+  const [redoStack, setRedoStack] = useState<Array<{ holeHistory: string; noteHistory: string; lyrics: string; harmonicaType: HarmonicaType }>>([]);
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   // const [savedTabsDialogOpen, setSavedTabsDialogOpen] = useState(false);
   const { toast } = useToast();
@@ -43,16 +44,18 @@ export default function HarpNavigator({ tab, mode = "create" }: HarpNavigatorPro
   const getCurrentState = useCallback(() => ({
     holeHistory,
     noteHistory,
+    lyrics,
     harmonicaType
-  }), [holeHistory, noteHistory, harmonicaType]);
+  }), [holeHistory, lyrics, noteHistory, harmonicaType]);
 
-  const applyState = useCallback((state: { holeHistory: string; noteHistory: string; harmonicaType: HarmonicaType }) => {
+  const applyState = useCallback((state: { holeHistory: string; noteHistory: string; lyrics: string; harmonicaType: HarmonicaType }) => {
     setHoleHistory(state.holeHistory);
     setNoteHistory(state.noteHistory);
+    setLyrics(state.lyrics);
     setHarmonicaType(state.harmonicaType);
   }, []);
 
-  const applyEdit = useCallback((nextState: { holeHistory: string; noteHistory: string; harmonicaType: HarmonicaType }) => {
+  const applyEdit = useCallback((nextState: { holeHistory: string; noteHistory: string; lyrics: string; harmonicaType: HarmonicaType }) => {
     setUndoStack(prev => [...prev, getCurrentState()]);
     setRedoStack([]);
     applyState(nextState);
@@ -224,6 +227,12 @@ export default function HarpNavigator({ tab, mode = "create" }: HarpNavigatorPro
     () => getInvalidHoleTokens(holeHistory),
     [getInvalidHoleTokens, holeHistory]
   );
+  const tabLineCount = useMemo(
+    () => Math.max(holeHistory.split('\n').length, noteHistory.split('\n').length),
+    [holeHistory, noteHistory]
+  );
+  const lyricLineCount = useMemo(() => lyrics.split('\n').length, [lyrics]);
+  const hasLyricsLineMismatch = Boolean(lyrics.trim()) && tabLineCount !== lyricLineCount;
 
   const handleNewLine = () => {
     const insertion = insertTextAtCursor(holeHistory, '\n');
@@ -231,6 +240,7 @@ export default function HarpNavigator({ tab, mode = "create" }: HarpNavigatorPro
     applyEdit({
       holeHistory: insertion.nextValue,
       noteHistory: convertHoleToNotes(insertion.nextValue),
+      lyrics,
       harmonicaType
     });
 
@@ -247,6 +257,7 @@ export default function HarpNavigator({ tab, mode = "create" }: HarpNavigatorPro
     applyEdit({
       holeHistory: removal.nextValue,
       noteHistory: convertHoleToNotes(removal.nextValue),
+      lyrics,
       harmonicaType
     });
 
@@ -286,6 +297,7 @@ export default function HarpNavigator({ tab, mode = "create" }: HarpNavigatorPro
       applyEdit({
         holeHistory: nextHoleHistory,
         noteHistory: convertHoleToNotes(nextHoleHistory),
+        lyrics,
         harmonicaType
       });
 
@@ -298,7 +310,7 @@ export default function HarpNavigator({ tab, mode = "create" }: HarpNavigatorPro
     setTimeout(() => {
       processingRef.current = false;
     }, 50);
-  }, [layout, applyEdit, convertHoleToNotes, focusHoleTextarea, holeHistory, harmonicaType, insertTokenAtCursor]);
+  }, [layout, applyEdit, convertHoleToNotes, focusHoleTextarea, holeHistory, harmonicaType, insertTokenAtCursor, lyrics]);
 
 
 
@@ -306,6 +318,7 @@ export default function HarpNavigator({ tab, mode = "create" }: HarpNavigatorPro
     applyEdit({
       holeHistory: '',
       noteHistory: '',
+      lyrics: '',
       harmonicaType
     });
   };
@@ -314,6 +327,7 @@ export default function HarpNavigator({ tab, mode = "create" }: HarpNavigatorPro
     applyEdit({
       holeHistory: value,
       noteHistory: convertHoleToNotes(value),
+      lyrics,
       harmonicaType
     });
   };
@@ -322,6 +336,16 @@ export default function HarpNavigator({ tab, mode = "create" }: HarpNavigatorPro
     applyEdit({
       holeHistory,
       noteHistory: value,
+      lyrics,
+      harmonicaType
+    });
+  };
+
+  const handleLyricsChange = (value: string) => {
+    applyEdit({
+      holeHistory,
+      noteHistory,
+      lyrics: value,
       harmonicaType
     });
   };
@@ -345,6 +369,7 @@ export default function HarpNavigator({ tab, mode = "create" }: HarpNavigatorPro
       applyEdit({
         holeHistory: result.convertedTab,
         noteHistory,
+        lyrics,
         harmonicaType: targetType
       });
       
@@ -410,6 +435,7 @@ export default function HarpNavigator({ tab, mode = "create" }: HarpNavigatorPro
         applyEdit({
           holeHistory: cleanedText,
           noteHistory: convertedNotes,
+          lyrics,
           harmonicaType
         });
         toast({
@@ -421,6 +447,7 @@ export default function HarpNavigator({ tab, mode = "create" }: HarpNavigatorPro
         applyEdit({
           holeHistory: '',
           noteHistory: cleanedText,
+          lyrics,
           harmonicaType
         });
         toast({
@@ -432,6 +459,7 @@ export default function HarpNavigator({ tab, mode = "create" }: HarpNavigatorPro
         applyEdit({
           holeHistory: cleanedText,
           noteHistory: cleanedText,
+          lyrics,
           harmonicaType
         });
         toast({
@@ -494,10 +522,11 @@ export default function HarpNavigator({ tab, mode = "create" }: HarpNavigatorPro
     return noteLines.join('\n');
   }
 
-  const handleLoadTab = (holeHistory: string, noteHistory: string) => {
+  const handleLoadTab = (holeHistory: string, noteHistory: string, lyrics: string) => {
     applyEdit({
       holeHistory,
       noteHistory,
+      lyrics,
       harmonicaType
     });
   };
@@ -541,6 +570,7 @@ export default function HarpNavigator({ tab, mode = "create" }: HarpNavigatorPro
               applyEdit({
                 holeHistory,
                 noteHistory,
+                lyrics,
                 harmonicaType: value
               });
               setSelectedHoleInfo(null);
@@ -609,7 +639,7 @@ export default function HarpNavigator({ tab, mode = "create" }: HarpNavigatorPro
               </div>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+              <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 md:gap-6">
                 <div>
                   <h3 className="font-semibold text-sm uppercase text-muted-foreground tracking-wider mb-2">Hole Numbers</h3>
                   <Textarea
@@ -639,6 +669,23 @@ export default function HarpNavigator({ tab, mode = "create" }: HarpNavigatorPro
                   <p className="mt-2 text-xs text-muted-foreground">
                     Notes sync when hole notation changes, and can also be adjusted directly as plain text.
                   </p>
+                </div>
+                <div>
+                  <h3 className="font-semibold text-sm uppercase text-muted-foreground tracking-wider mb-2">Lyrics</h3>
+                  <Textarea
+                    value={lyrics}
+                    onChange={(event) => handleLyricsChange(event.target.value)}
+                    placeholder={"One lyric line per tab line\nLeave blank if instrumental"}
+                    className="min-h-[180px] resize-y bg-background/50 text-sm md:text-base"
+                  />
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Align lyrics by line, not by note. Each lyric line should match the tab line above it.
+                  </p>
+                  {hasLyricsLineMismatch && (
+                    <p className="mt-2 text-xs text-amber-600 dark:text-amber-400">
+                      Tab lines: {tabLineCount}. Lyric lines: {lyricLineCount}. Extra lyric lines will not be shown.
+                    </p>
+                  )}
                 </div>
               </div>
             </CardContent>
@@ -672,10 +719,12 @@ export default function HarpNavigator({ tab, mode = "create" }: HarpNavigatorPro
         onOpenChange={setSaveDialogOpen}
         holeHistory={holeHistory}
         noteHistory={noteHistory}
+        lyrics={lyrics}
         harmonicaType={harmonicaType}
         editingTab={mode === 'edit' && tab ? {
           id: tab.id,
           title: tab.title,
+          lyrics: tab.lyrics,
           difficulty: tab.difficulty,
           genre: tab.genre,
           key: tab.key,
