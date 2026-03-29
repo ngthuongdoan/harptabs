@@ -42,6 +42,9 @@ export function usePitchDetector() {
   const analyserRef = useRef<AnalyserNode | null>(null);
   const animationFrameRef = useRef<number | null>(null);
   const pitchDetectorRef = useRef<ReturnType<typeof PitchDetector.forFloat32Array> | null>(null);
+  const uploadedAudioBufferRef = useRef<AudioBuffer | null>(null);
+  const previewAudioContextRef = useRef<AudioContext | null>(null);
+  const previewSourceRef = useRef<AudioBufferSourceNode | null>(null);
 
   /**
    * Converts a detected frequency into a musical note and cents offset.  This
@@ -309,6 +312,63 @@ export function usePitchDetector() {
   }, []);
 
   /**
+   * Plays a short preview from the original uploaded audio around the
+   * requested time.  Any previous preview is stopped before starting a new
+   * one so slider scrubbing remains responsive.
+   */
+  const playPreviewAtTime = useCallback(async (time: number) => {
+    const sourceBuffer = uploadedAudioBufferRef.current;
+    if (!sourceBuffer) return;
+
+    if (!previewAudioContextRef.current || previewAudioContextRef.current.state === 'closed') {
+      previewAudioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+    }
+
+    const previewCtx = previewAudioContextRef.current;
+    if (previewCtx.state === 'suspended') {
+      await previewCtx.resume();
+    }
+
+    if (previewSourceRef.current) {
+      previewSourceRef.current.stop();
+      previewSourceRef.current.disconnect();
+      previewSourceRef.current = null;
+    }
+
+    const previewDuration = 4;
+    const halfWindow = previewDuration / 2;
+    const startTime = Math.max(0, time - halfWindow);
+    const safeDuration = Math.min(previewDuration, sourceBuffer.duration - startTime);
+    if (safeDuration <= 0) return;
+
+    const sampleRate = sourceBuffer.sampleRate;
+    const startSample = Math.floor(startTime * sampleRate);
+    const frameCount = Math.max(1, Math.floor(safeDuration * sampleRate));
+    const previewBuffer = previewCtx.createBuffer(
+      sourceBuffer.numberOfChannels,
+      frameCount,
+      sampleRate
+    );
+
+    for (let channel = 0; channel < sourceBuffer.numberOfChannels; channel++) {
+      const sourceData = sourceBuffer.getChannelData(channel);
+      previewBuffer.getChannelData(channel).set(sourceData.subarray(startSample, startSample + frameCount));
+    }
+
+    const source = previewCtx.createBufferSource();
+    source.buffer = previewBuffer;
+    source.connect(previewCtx.destination);
+    source.onended = () => {
+      if (previewSourceRef.current === source) {
+        previewSourceRef.current.disconnect();
+        previewSourceRef.current = null;
+      }
+    };
+    previewSourceRef.current = source;
+    source.start();
+  }, []);
+
+  /**
    * Accepts an uploaded audio file, decodes it via Web Audio, preprocesses
    * through mixing, filtering and normalisation, then runs the offline
    * analysis.  During analysis, the hook is effectively in a paused state
@@ -318,6 +378,7 @@ export function usePitchDetector() {
     const arrayBuffer = await file.arrayBuffer();
     const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
     const decoded = await ctx.decodeAudioData(arrayBuffer);
+    uploadedAudioBufferRef.current = decoded;
     // Preprocess the buffer to improve pitch detection reliability
     const preprocessed = await applyVoiceBandFilter(decoded);
     await analyzeAudioBuffer(preprocessed);
@@ -328,6 +389,15 @@ export function usePitchDetector() {
   useEffect(() => {
     return () => {
       stopMicrophone();
+      if (previewSourceRef.current) {
+        previewSourceRef.current.stop();
+        previewSourceRef.current.disconnect();
+        previewSourceRef.current = null;
+      }
+      if (previewAudioContextRef.current) {
+        previewAudioContextRef.current.close();
+        previewAudioContextRef.current = null;
+      }
     };
   }, [stopMicrophone]);
 
@@ -341,5 +411,6 @@ export function usePitchDetector() {
     stopMicrophone,
     loadAudioFile,
     getPitchAtTime,
+    playPreviewAtTime,
   };
 }
