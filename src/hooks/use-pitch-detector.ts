@@ -12,6 +12,11 @@ export interface PitchData {
 
 export type DetectionMode = "microphone" | "file";
 
+interface PitchFrame {
+  time: number;
+  pitch: PitchData | null;
+}
+
 const NOTES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 
 function frequencyToNote(frequency: number): { note: string; cents: number } {
@@ -37,6 +42,8 @@ export function usePitchDetector() {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [fileName, setFileName] = useState<string | null>(null);
+  const [isAnalyzingFile, setIsAnalyzingFile] = useState(false);
+  const [analysisProgress, setAnalysisProgress] = useState(0);
   
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
@@ -50,8 +57,55 @@ export function usePitchDetector() {
   const pauseTimeRef = useRef<number>(0);
   const lastPitchTimeRef = useRef<number>(0);
   const noPitchCountRef = useRef<number>(0);
+  const filePitchFramesRef = useRef<PitchFrame[]>([]);
+
+  const getPitchAtTime = useCallback((time: number) => {
+    const frames = filePitchFramesRef.current;
+    if (frames.length === 0) {
+      return null;
+    }
+
+    let low = 0;
+    let high = frames.length - 1;
+
+    while (low <= high) {
+      const mid = Math.floor((low + high) / 2);
+      if (frames[mid].time < time) {
+        low = mid + 1;
+      } else {
+        high = mid - 1;
+      }
+    }
+
+    const nextFrame = frames[low];
+    const prevFrame = frames[Math.max(0, low - 1)];
+
+    if (!nextFrame) {
+      return prevFrame?.pitch ?? null;
+    }
+
+    if (!prevFrame) {
+      return nextFrame.pitch;
+    }
+
+    return Math.abs(nextFrame.time - time) < Math.abs(prevFrame.time - time)
+      ? nextFrame.pitch
+      : prevFrame.pitch;
+  }, []);
 
   const updatePitch = useCallback(() => {
+    if (mode === "file") {
+      if (audioContextRef.current && isPlaying) {
+        const elapsed = audioContextRef.current.currentTime - startTimeRef.current + pauseTimeRef.current;
+        const nextTime = Math.min(elapsed, duration);
+        setCurrentTime(nextTime);
+        setPitchData(getPitchAtTime(nextTime));
+      }
+
+      animationFrameRef.current = requestAnimationFrame(updatePitch);
+      return;
+    }
+
     if (!analyserRef.current || !detectorRef.current) return;
 
     const inputBuffer = new Float32Array(detectorRef.current.inputLength);
@@ -80,14 +134,56 @@ export function usePitchDetector() {
       }
     }
 
-    // Update current time for file playback
-    if (mode === "file" && audioContextRef.current && isPlaying) {
-      const elapsed = audioContextRef.current.currentTime - startTimeRef.current + pauseTimeRef.current;
-      setCurrentTime(Math.min(elapsed, duration));
+    animationFrameRef.current = requestAnimationFrame(updatePitch);
+  }, [duration, getPitchAtTime, isPlaying, mode]);
+
+  const analyzeAudioBuffer = useCallback(async (audioBuffer: AudioBuffer) => {
+    const sampleRate = audioBuffer.sampleRate;
+    const windowSize = 2048;
+    const hopSize = 1024;
+    const channelData = audioBuffer.getChannelData(0);
+    const frames: PitchFrame[] = [];
+    const detector = PitchDetector.forFloat32Array(windowSize);
+    const totalFrames = Math.max(1, Math.ceil(Math.max(1, channelData.length - windowSize) / hopSize));
+
+    setIsAnalyzingFile(true);
+    setAnalysisProgress(0);
+
+    for (let offset = 0, frameIndex = 0; offset + windowSize <= channelData.length; offset += hopSize, frameIndex++) {
+      const slice = channelData.slice(offset, offset + windowSize);
+      const [frequency, clarity] = detector.findPitch(slice, sampleRate);
+      const time = offset / sampleRate;
+
+      if (frequency && clarity > 0.7) {
+        const { note, cents } = frequencyToNote(frequency);
+        frames.push({
+          time,
+          pitch: {
+            frequency: Math.round(frequency * 100) / 100,
+            clarity: Math.round(clarity * 100) / 100,
+            note,
+            cents,
+          },
+        });
+      } else {
+        frames.push({ time, pitch: null });
+      }
+
+      if (frameIndex % 50 === 0) {
+        setAnalysisProgress(Math.min(100, Math.round((frameIndex / totalFrames) * 100)));
+        await new Promise<void>((resolve) => {
+          window.setTimeout(resolve, 0);
+        });
+      }
     }
 
-    animationFrameRef.current = requestAnimationFrame(updatePitch);
-  }, [mode, isPlaying, duration]);
+    filePitchFramesRef.current = frames;
+    setAnalysisProgress(100);
+    setIsAnalyzingFile(false);
+
+    const firstPitch = frames.find((frame) => frame.pitch)?.pitch ?? null;
+    setPitchData(firstPitch);
+  }, []);
 
   const startListening = useCallback(async () => {
     try {
@@ -125,6 +221,8 @@ export function usePitchDetector() {
     try {
       setError(null);
       setFileName(file.name);
+      setPitchData(null);
+      filePitchFramesRef.current = [];
 
       // Read file as array buffer
       const arrayBuffer = await file.arrayBuffer();
@@ -148,18 +246,19 @@ export function usePitchDetector() {
       setCurrentTime(0);
       setMode("file");
       setIsListening(true);
+      pauseTimeRef.current = 0;
       
-      // Don't start playing automatically
       setIsPlaying(false);
+      void analyzeAudioBuffer(audioBuffer);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Failed to load audio file";
       setError(errorMessage);
       console.error("Error loading audio file:", err);
     }
-  }, []);
+  }, [analyzeAudioBuffer]);
 
   const playAudio = useCallback(() => {
-    if (!audioContextRef.current || !audioBufferRef.current || !analyserRef.current) return;
+    if (!audioContextRef.current || !audioBufferRef.current) return;
 
     // Stop existing source if any
     if (sourceNodeRef.current) {
@@ -170,8 +269,13 @@ export function usePitchDetector() {
     // Create new source
     const source = audioContextRef.current.createBufferSource();
     source.buffer = audioBufferRef.current;
-    source.connect(analyserRef.current);
-    analyserRef.current.connect(audioContextRef.current.destination);
+
+    if (mode === "file") {
+      source.connect(audioContextRef.current.destination);
+    } else if (analyserRef.current) {
+      source.connect(analyserRef.current);
+      analyserRef.current.connect(audioContextRef.current.destination);
+    }
 
     // Start from current time
     const offset = pauseTimeRef.current;
@@ -214,11 +318,12 @@ export function usePitchDetector() {
 
     pauseTimeRef.current = time;
     setCurrentTime(time);
+    setPitchData(getPitchAtTime(time));
 
     if (wasPlaying) {
       playAudio();
     }
-  }, [isPlaying, pauseAudio, playAudio]);
+  }, [getPitchAtTime, isPlaying, pauseAudio, playAudio]);
 
   const stopListening = useCallback(() => {
     // Cancel animation frame
@@ -261,8 +366,11 @@ export function usePitchDetector() {
     setCurrentTime(0);
     setDuration(0);
     setFileName(null);
+    setIsAnalyzingFile(false);
+    setAnalysisProgress(0);
     pauseTimeRef.current = 0;
     startTimeRef.current = 0;
+    filePitchFramesRef.current = [];
   }, []);
 
   // Cleanup on unmount
@@ -281,6 +389,8 @@ export function usePitchDetector() {
     currentTime,
     duration,
     fileName,
+    isAnalyzingFile,
+    analysisProgress,
     startListening,
     stopListening,
     loadAudioFile,

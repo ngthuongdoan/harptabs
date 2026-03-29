@@ -26,6 +26,8 @@ export default function PitchDetector() {
     currentTime,
     duration,
     fileName,
+    isAnalyzingFile,
+    analysisProgress,
     startListening,
     stopListening,
     loadAudioFile,
@@ -55,7 +57,7 @@ export default function PitchDetector() {
           Pitch Detector
         </CardTitle>
         <CardDescription>
-          Detect pitch from your microphone or upload an audio file
+          Detect pitch from your microphone or analyze an uploaded audio file in the background
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -129,12 +131,23 @@ export default function PitchDetector() {
                   </Button>
                 </div>
 
+                {isAnalyzingFile && (
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>Analyzing uploaded audio</span>
+                      <span>{analysisProgress}%</span>
+                    </div>
+                    <Progress value={analysisProgress} className="h-2" />
+                  </div>
+                )}
+
                 {/* Playback controls */}
                 <div className="flex items-center gap-2">
                   <Button
                     size="sm"
                     variant="outline"
                     onClick={isPlaying ? pauseAudio : playAudio}
+                    disabled={isAnalyzingFile}
                   >
                     {isPlaying ? (
                       <Pause className="h-4 w-4" />
@@ -219,9 +232,11 @@ export default function PitchDetector() {
                   <p>
                     {mode === "microphone"
                       ? "Play a note on your harmonica..."
-                      : isPlaying
+                      : isAnalyzingFile
+                        ? "Analyzing uploaded audio in the background..."
+                        : isPlaying
                         ? "Listening for pitch..."
-                        : "Click play to start analyzing"}
+                        : "Analysis complete. Press play or scrub the timeline to inspect pitches."}
                   </p>
                 </div>
               )}
