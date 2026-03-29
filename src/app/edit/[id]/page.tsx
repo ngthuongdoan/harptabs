@@ -1,4 +1,4 @@
-import HarpNavigator from "@/components/harp-navigator";
+import HarpNavigator from "@/components/harp-workbench/harp-navigator";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";

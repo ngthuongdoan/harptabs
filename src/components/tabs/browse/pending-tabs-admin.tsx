@@ -9,9 +9,9 @@ import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { useTabManagement } from '@/hooks/use-tab-management';
 import { Check, X, Eye, Pencil } from 'lucide-react';
-import { TabCard } from '@/components/tab-card';
-import { TabViewDialog } from '@/components/tab-view-dialog';
-import { ResponsiveTabGrid } from '@/components/responsive-tab-grid';
+import { TabCard } from '@/components/tabs/display/tab-card';
+import { TabViewDialog } from '@/components/tabs/display/tab-view-dialog';
+import { ResponsiveTabGrid } from '@/components/tabs/browse/responsive-tab-grid';
 import { formatDate } from '@/lib/tab-utils';
 import {
   AlertDialog,
@@ -23,7 +23,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import type { SavedTab } from '../../lib/db';
+import type { SavedTab } from '../../../../lib/db';
 
 interface PendingTabsAdminProps {
   apiKey: string;

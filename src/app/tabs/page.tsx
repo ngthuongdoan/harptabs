@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Plus } from "lucide-react";
-import ApprovedTabsLibrary from "@/components/approved-tabs-library";
+import ApprovedTabsLibrary from "@/components/tabs/browse/approved-tabs-library";
 
 export const revalidate = 60;
 

@@ -1,7 +1,7 @@
 import { Card, CardContent, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Calendar, Eye, Music2 } from "lucide-react";
-import type { SavedTab } from '../../lib/db';
+import type { SavedTab } from '../../../../lib/db';
 
 interface TabCardProps {
   tab: SavedTab;

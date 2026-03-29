@@ -1,4 +1,4 @@
-import TabConverter from '@/components/tab-converter';
+import TabConverter from '@/components/harp-workbench/tab-converter';
 
 export default function ConverterPage() {
   return (

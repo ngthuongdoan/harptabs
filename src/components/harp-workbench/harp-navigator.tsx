@@ -11,14 +11,14 @@ import {
 } from "@/components/ui/select";
 import { useToast } from '@/hooks/use-toast';
 import { convertDiatonicToTremolo, convertTremoloToDiatonic, getHarmonicaLayout, type HarmonicaType, type HoleAction, isDiatonicLayout, isTremoloLayout, type Note } from '@/lib/harmonica';
-import type { SavedTab } from '../../lib/db';
+import type { SavedTab } from '../../../lib/db';
 import { ArrowRightLeft, Clipboard, CornerDownLeft, Delete, Redo2, Save, Trash2, Undo2 } from 'lucide-react';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import HarmonicaDiagram from './harmonica-diagram';
-import SaveTabDialog from './save-tab-dialog';
-import { Button } from './ui/button';
-import { Separator } from './ui/separator';
-import { Textarea } from './ui/textarea';
+import SaveTabDialog from '@/components/tabs/editor/save-tab-dialog';
+import { Button } from '@/components/ui/button';
+import { Separator } from '@/components/ui/separator';
+import { Textarea } from '@/components/ui/textarea';
 
 interface HarpNavigatorProps {
   tab?: SavedTab;

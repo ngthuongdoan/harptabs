@@ -24,7 +24,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import SaveTabDialog from './save-tab-dialog';
+import SaveTabDialog from '@/components/tabs/editor/save-tab-dialog';
 
 interface SavedTabsManagerProps {
   open: boolean;

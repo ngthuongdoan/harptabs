@@ -1,8 +1,8 @@
 "use client";
 
 import { useAdmin } from "@/contexts/admin-context";
-import ApprovedTabsDisplay from "@/components/approved-tabs-display";
-import PendingTabsAdmin from "@/components/pending-tabs-admin";
+import ApprovedTabsDisplay from "@/components/tabs/browse/approved-tabs-display";
+import PendingTabsAdmin from "@/components/tabs/browse/pending-tabs-admin";
 import AdminLogin from "@/components/admin-login";
 import { Button } from "@/components/ui/button";
 import { BookOpen, Plus, Mic } from "lucide-react";

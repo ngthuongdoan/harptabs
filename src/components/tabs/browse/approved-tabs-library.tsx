@@ -1,11 +1,7 @@
 "use client";
 
-import { TabCard } from "@/components/tab-card";
-import { TabViewDialog } from "@/components/tab-view-dialog";
-import { ResponsiveTabGrid } from "@/components/responsive-tab-grid";
-import { Badge } from "@/components/ui/badge";
+import { ApprovedTabsGrid } from "@/components/tabs/browse/approved-tabs-grid";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -16,10 +12,9 @@ import {
 } from "@/components/ui/select";
 import { useTabViewTracking } from "@/hooks/use-tab-view-tracking";
 import { useToast } from "@/hooks/use-toast";
-import { formatDateShort } from "@/lib/tab-utils";
-import { ChevronLeft, ChevronRight, Eye } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useEffect, useState } from "react";
-import type { SavedTab } from "../../lib/db";
+import type { SavedTab } from "../../../../lib/db";
 
 const PAGE_SIZE = 9;
 
@@ -36,10 +31,6 @@ export default function ApprovedTabsLibrary() {
   const [keyFilter, setKeyFilter] = useState("");
   const [sortOption, setSortOption] = useState<"newest" | "views">("newest");
   const [selectedTab, setSelectedTab] = useState<SavedTab | null>(null);
-  const [alertDialog, setAlertDialog] = useState<{
-    title: string;
-    description: string;
-  } | null>(null);
   const { toast } = useToast();
   const { trackView } = useTabViewTracking();
 
@@ -124,11 +115,6 @@ export default function ApprovedTabsLibrary() {
   const canGoForward = page < totalPages;
   const startIndex = totalTabs === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
   const endIndex = Math.min(page * PAGE_SIZE, totalTabs);
-  const isAlertDialogOpen = Boolean(alertDialog);
-
-  const openAlertDialog = (title: string, description: string) => {
-    setAlertDialog({ title, description });
-  };
 
   return (
     <div className="space-y-6">
@@ -257,54 +243,14 @@ export default function ApprovedTabsLibrary() {
           </p>
         </div>
       ) : (
-            <ResponsiveTabGrid>
-              {tabs.map((tab) => (
-            <TabCard
-              key={tab.id}
-              tab={tab}
-              dateFormatter={formatDateShort}
-              additionalBadges={<Badge variant="secondary">Approved</Badge>}
-            >
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full"
-                onClick={() => handleViewTab(tab)}
-              >
-                <Eye className="h-4 w-4 mr-2" />
-                View Full Tab
-              </Button>
-            </TabCard>
-          ))}
-            </ResponsiveTabGrid>
+        <ApprovedTabsGrid
+          tabs={tabs}
+          selectedTab={selectedTab}
+          onViewTab={handleViewTab}
+          onCloseView={() => setSelectedTab(null)}
+          showDetailedErrors={true}
+        />
       )}
-
-      <TabViewDialog
-        tab={selectedTab}
-        open={!!selectedTab}
-        onOpenChange={(open) => !open && setSelectedTab(null)}
-        dateFormatter={formatDateShort}
-        additionalBadges={<Badge variant="secondary">Approved</Badge>}
-        showDetailedErrors={true}
-      >
-        <Button variant="outline" onClick={() => setSelectedTab(null)}>
-          Close
-        </Button>
-      </TabViewDialog>
-
-      <Dialog open={isAlertDialogOpen} onOpenChange={(open) => !open && setAlertDialog(null)}>
-        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{alertDialog?.title}</DialogTitle>
-            <DialogDescription>{alertDialog?.description}</DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setAlertDialog(null)}>
-              Close
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

@@ -2,17 +2,13 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useToast } from '@/hooks/use-toast';
 import { useTabViewTracking } from '@/hooks/use-tab-view-tracking';
 import { useTabManagement } from '@/hooks/use-tab-management';
-import { Eye, Pencil, Trash } from 'lucide-react';
-import { TabCard } from '@/components/tab-card';
-import { TabViewDialog } from '@/components/tab-view-dialog';
-import { ResponsiveTabGrid } from '@/components/responsive-tab-grid';
-import { formatDateShort } from '@/lib/tab-utils';
-import type { SavedTab } from '../../lib/db';
+import { Pencil, Trash } from 'lucide-react';
+import { ApprovedTabsGrid } from '@/components/tabs/browse/approved-tabs-grid';
+import type { SavedTab } from '../../../../lib/db';
 
 interface ApprovedTabsDisplayProps {
   apiKey?: string | null;
@@ -89,55 +85,26 @@ export default function ApprovedTabsDisplay({ apiKey }: ApprovedTabsDisplayProps
 
   return (
     <div className="space-y-6">
-      <ResponsiveTabGrid>
-        {tabs.map((tab) => (
-          <TabCard
-            key={tab.id}
-            tab={tab}
-            dateFormatter={formatDateShort}
-            additionalBadges={
-              <Badge variant="secondary">Approved</Badge>
-            }
-          >
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full"
-              onClick={() => handleViewTab(tab)}
-            >
-              <Eye className="h-4 w-4 mr-2" />
-              View Full Tab
-            </Button>
-          </TabCard>
-        ))}
-      </ResponsiveTabGrid>
-
-      <TabViewDialog
-        tab={viewingTab}
-        open={!!viewingTab}
-        onOpenChange={(open) => !open && handleCloseView()}
-        dateFormatter={formatDateShort}
-        additionalBadges={<Badge variant="secondary">Approved</Badge>}
-      >
-        <Button variant="outline" onClick={handleCloseView}>
-          Close
-        </Button>
-        {apiKey && viewingTab && (
-          <>
-            <Button variant={"destructive"} onClick={() => handleDelete(viewingTab)}>
-              <Trash className="mr-2 h-4 w-4" />
-              Delete
-            </Button>
-          <Button variant="default" onClick={() => router.push(`/edit/${viewingTab.id}`)}>
-            <Pencil className="mr-2 h-4 w-4" />
-            Edit Tab
-          </Button>
-          </>
-
-        )}
-      </TabViewDialog>
-
-
+      <ApprovedTabsGrid
+        tabs={tabs}
+        selectedTab={viewingTab}
+        onViewTab={handleViewTab}
+        onCloseView={handleCloseView}
+        dialogActions={(tab) =>
+          apiKey ? (
+            <>
+              <Button variant="destructive" onClick={() => handleDelete(tab)}>
+                <Trash className="mr-2 h-4 w-4" />
+                Delete
+              </Button>
+              <Button variant="default" onClick={() => router.push(`/edit/${tab.id}`)}>
+                <Pencil className="mr-2 h-4 w-4" />
+                Edit Tab
+              </Button>
+            </>
+          ) : null
+        }
+      />
     </div>
   );
 }

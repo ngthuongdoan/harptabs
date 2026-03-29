@@ -4,11 +4,11 @@ import { useState } from 'react';
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { TabTypeBadge } from '@/components/tab-card';
-import { TabContentView } from '@/components/tab-content-view';
+import { TabTypeBadge } from '@/components/tabs/display/tab-card';
+import { TabContentView } from '@/components/tabs/display/tab-content-view';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertTriangle, Info, XCircle } from 'lucide-react';
-import type { SavedTab } from '../../lib/db';
+import type { SavedTab } from '../../../../lib/db';
 import { convertDiatonicToTremolo, convertTremoloToDiatonic, type HarmonicaType } from '@/lib/harmonica';
 
 interface TabViewDialogProps {
