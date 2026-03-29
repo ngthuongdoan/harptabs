@@ -74,12 +74,23 @@ const DropdownMenuContent = React.forwardRef<
 ))
 DropdownMenuContent.displayName = DropdownMenuPrimitive.Content.displayName
 
+type ShadcnDropdownMenuItemProps = {
+  inset?: boolean;
+  children?: React.ReactNode;
+  className?: string;
+  onClick?: React.MouseEventHandler<HTMLDivElement>;
+  disabled?: boolean;
+  onSelect?: (event: Event) => void;
+  textValue?: string;
+  asChild?: boolean;
+  id?: string;
+  style?: React.CSSProperties;
+}
+
 const DropdownMenuItem = React.forwardRef<
   React.ElementRef<typeof DropdownMenuPrimitive.Item>,
-  React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Item> & {
-    inset?: boolean
-  }
->(({ className, inset, ...props }, ref) => (
+  ShadcnDropdownMenuItemProps
+>(({ className, inset, children, ...props }, ref) => (
   <DropdownMenuPrimitive.Item
     ref={ref}
     className={cn(
@@ -87,8 +98,10 @@ const DropdownMenuItem = React.forwardRef<
       inset && "pl-8",
       className
     )}
-    {...props}
-  />
+    {...(props as React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Item>)}
+  >
+    {children}
+  </DropdownMenuPrimitive.Item>
 ))
 DropdownMenuItem.displayName = DropdownMenuPrimitive.Item.displayName
 

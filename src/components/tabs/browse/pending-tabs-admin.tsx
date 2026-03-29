@@ -29,6 +29,9 @@ interface PendingTabsAdminProps {
   apiKey: string;
 }
 
+const pendingTabsCache = new Map<string, SavedTab[]>();
+const pendingTabsRequests = new Map<string, Promise<SavedTab[]>>();
+
 export default function PendingTabsAdmin({ apiKey }: PendingTabsAdminProps) {
   const [tabs, setTabs] = useState<SavedTab[]>([]);
   const [loading, setLoading] = useState(true);
@@ -46,17 +49,36 @@ export default function PendingTabsAdmin({ apiKey }: PendingTabsAdminProps) {
 
   useEffect(() => {
     loadPendingTabs();
-  }, []);
+  }, [apiKey]);
 
-  const loadPendingTabs = async () => {
+  const loadPendingTabs = async (forceRefresh = false) => {
     try {
-      const response = await fetch('/api/tabs/pending', {
-        headers: {
-          'x-api-key': apiKey
+      if (!forceRefresh) {
+        const cachedTabs = pendingTabsCache.get(apiKey);
+        if (cachedTabs) {
+          setTabs(cachedTabs);
+          return;
         }
-      });
-      if (!response.ok) throw new Error('Failed to fetch pending tabs');
-      const data = await response.json();
+      }
+
+      let request = pendingTabsRequests.get(apiKey);
+      if (!request || forceRefresh) {
+        request = fetch('/api/tabs/pending', {
+          headers: {
+            'x-api-key': apiKey
+          }
+        }).then(async (response) => {
+          if (!response.ok) {
+            throw new Error('Failed to fetch pending tabs');
+          }
+
+          return response.json() as Promise<SavedTab[]>;
+        });
+        pendingTabsRequests.set(apiKey, request);
+      }
+
+      const data = await request;
+      pendingTabsCache.set(apiKey, data);
       setTabs(data);
     } catch (error) {
       toast({
@@ -65,6 +87,7 @@ export default function PendingTabsAdmin({ apiKey }: PendingTabsAdminProps) {
         variant: "destructive"
       });
     } finally {
+      pendingTabsRequests.delete(apiKey);
       setLoading(false);
     }
   };
@@ -130,7 +153,9 @@ export default function PendingTabsAdmin({ apiKey }: PendingTabsAdminProps) {
       if (viewingTab?.id === actionTab.id) {
         handleCloseView();
       }
-      loadPendingTabs();
+      pendingTabsCache.delete(apiKey);
+      pendingTabsRequests.delete(apiKey);
+      loadPendingTabs(true);
     } catch (error) {
       toast({
         title: "Error",
@@ -178,7 +203,7 @@ export default function PendingTabsAdmin({ apiKey }: PendingTabsAdminProps) {
               {tabs.length} tab{tabs.length !== 1 ? 's' : ''} awaiting approval
             </p>
           </div>
-          <Button variant="outline" onClick={loadPendingTabs}>
+          <Button variant="outline" onClick={() => loadPendingTabs(true)}>
             Refresh
           </Button>
         </div>

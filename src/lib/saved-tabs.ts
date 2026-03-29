@@ -15,6 +15,27 @@ export interface SavedTab {
   updatedAt: Date;
 }
 
+function getStoredAdminCredential(): string | null {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  const storedCredential = window.localStorage.getItem('admin_api_key')?.trim();
+  return storedCredential || null;
+}
+
+function getAdminAuthHeaders(): HeadersInit {
+  const adminCredential = getStoredAdminCredential();
+  if (!adminCredential) {
+    return {};
+  }
+
+  return {
+    'x-admin-password': adminCredential,
+    'x-api-key': adminCredential,
+  };
+}
+
 export class SavedTabsManager {
   // Get all tabs from the database
   static async getAllTabs(): Promise<SavedTab[]> {
@@ -92,6 +113,7 @@ export class SavedTabsManager {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
+          ...getAdminAuthHeaders(),
         },
         body: JSON.stringify({
           title,
@@ -122,6 +144,9 @@ export class SavedTabsManager {
     try {
       const response = await fetch(`/api/tabs/${id}`, {
         method: 'DELETE',
+        headers: {
+          ...getAdminAuthHeaders(),
+        },
       });
       
       return response.ok;

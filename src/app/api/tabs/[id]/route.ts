@@ -14,7 +14,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const { id } = await params;
     await initializeDatabase();
     
-    const includeAll = isAuthenticated(request);
+    const includeAll = await isAuthenticated(request);
     const tab = await TabsDB.getTab(id, includeAll);
     if (!tab) {
       return NextResponse.json({ error: 'Tab not found' }, { status: 404 });
@@ -29,12 +29,13 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
 // PUT /api/tabs/[id] - Update tab
 export async function PUT(request: NextRequest, { params }: RouteParams) {
-  // Check authentication
-  if (!isAuthenticated(request)) {
-    return unauthorizedResponse();
-  }
-  
   try {
+    await initializeDatabase();
+
+    if (!await isAuthenticated(request)) {
+      return unauthorizedResponse();
+    }
+
     const { id } = await params;
     const {
       title,
@@ -51,8 +52,6 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     if (!title || typeof title !== 'string') {
       return NextResponse.json({ error: 'Title is required' }, { status: 400 });
     }
-    
-    await initializeDatabase();
     
     const normalizedYoutubeLink = typeof youtubeLink === 'string' ? youtubeLink.trim() : null;
     const normalizedThumbnailUrl = typeof thumbnailUrl === 'string' ? thumbnailUrl.trim() : null;
@@ -83,14 +82,14 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
 
 // DELETE /api/tabs/[id] - Delete tab
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
-  // Check authentication
-  if (!isAuthenticated(request)) {
-    return unauthorizedResponse();
-  }
-  
   try {
-    const { id } = await params;
     await initializeDatabase();
+
+    if (!await isAuthenticated(request)) {
+      return unauthorizedResponse();
+    }
+
+    const { id } = await params;
     
     const success = await TabsDB.deleteTab(id);
     if (!success) {

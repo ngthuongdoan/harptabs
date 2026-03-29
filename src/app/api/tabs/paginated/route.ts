@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
     
     await initializeDatabase();
     
-    const includeAll = isAuthenticated(request);
+    const includeAll = await isAuthenticated(request);
     const result = await AdvancedTabsDB.getTabsPaginated(page, limit, includeAll, {
       query,
       difficulty: difficulty as "Beginner" | "Intermediate" | "Advanced" | undefined,

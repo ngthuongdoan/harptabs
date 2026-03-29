@@ -14,6 +14,9 @@ interface ApprovedTabsDisplayProps {
   apiKey?: string | null;
 }
 
+let approvedTabsCache: SavedTab[] | null = null;
+let approvedTabsRequest: Promise<SavedTab[]> | null = null;
+
 export default function ApprovedTabsDisplay({ apiKey }: ApprovedTabsDisplayProps) {
   const [tabs, setTabs] = useState<SavedTab[]>([]);
   const [loading, setLoading] = useState(true);
@@ -31,11 +34,25 @@ export default function ApprovedTabsDisplay({ apiKey }: ApprovedTabsDisplayProps
     loadApprovedTabs();
   }, []);
 
-  const loadApprovedTabs = async () => {
+  const loadApprovedTabs = async (forceRefresh = false) => {
     try {
-      const response = await fetch('/api/tabs');
-      if (!response.ok) throw new Error('Failed to fetch tabs');
-      const data = await response.json();
+      if (!forceRefresh && approvedTabsCache) {
+        setTabs(approvedTabsCache);
+        return;
+      }
+
+      if (!approvedTabsRequest || forceRefresh) {
+        approvedTabsRequest = fetch('/api/tabs').then(async (response) => {
+          if (!response.ok) {
+            throw new Error('Failed to fetch tabs');
+          }
+
+          return response.json() as Promise<SavedTab[]>;
+        });
+      }
+
+      const data = await approvedTabsRequest;
+      approvedTabsCache = data;
       setTabs(data);
     } catch (error) {
       toast({
@@ -44,6 +61,7 @@ export default function ApprovedTabsDisplay({ apiKey }: ApprovedTabsDisplayProps
         variant: "destructive"
       });
     } finally {
+      approvedTabsRequest = null;
       setLoading(false);
     }
   };
@@ -56,13 +74,15 @@ export default function ApprovedTabsDisplay({ apiKey }: ApprovedTabsDisplayProps
 
     // Update local state to reflect new view count
     if (tracked) {
-      setTabs(prevTabs =>
-        prevTabs.map(t =>
+      setTabs((prevTabs) => {
+        const nextTabs = prevTabs.map((t) =>
           t.id === tab.id
             ? { ...t, viewCount: t.viewCount + 1 }
             : t
-        )
-      );
+        );
+        approvedTabsCache = nextTabs;
+        return nextTabs;
+      });
     }
   };
 

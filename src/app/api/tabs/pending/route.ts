@@ -4,13 +4,12 @@ import { isAuthenticated, unauthorizedResponse } from '../../../../../lib/auth';
 
 // GET /api/tabs/pending - List all pending tabs (admin only)
 export async function GET(request: NextRequest) {
-  // Check authentication
-  if (!isAuthenticated(request)) {
-    return unauthorizedResponse();
-  }
-
   try {
     await initializeDatabase();
+
+    if (!await isAuthenticated(request)) {
+      return unauthorizedResponse();
+    }
     const tabs = await TabsDB.getPendingTabs();
     return NextResponse.json(tabs);
   } catch (error) {

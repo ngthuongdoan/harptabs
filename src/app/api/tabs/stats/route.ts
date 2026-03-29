@@ -8,7 +8,7 @@ export async function GET(request: NextRequest) {
   try {
     await initializeDatabase();
     
-    const includeAll = isAuthenticated(request);
+    const includeAll = await isAuthenticated(request);
     const stats = await AdvancedTabsDB.getTabsStats(includeAll);
     return NextResponse.json(stats);
   } catch (error) {

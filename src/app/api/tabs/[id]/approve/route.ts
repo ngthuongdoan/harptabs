@@ -10,14 +10,14 @@ interface RouteParams {
 
 // POST /api/tabs/[id]/approve - Approve a pending tab (admin only)
 export async function POST(request: NextRequest, { params }: RouteParams) {
-  // Check authentication
-  if (!isAuthenticated(request)) {
-    return unauthorizedResponse();
-  }
-
   try {
-    const { id } = await params;
     await initializeDatabase();
+
+    if (!await isAuthenticated(request)) {
+      return unauthorizedResponse();
+    }
+
+    const { id } = await params;
     
     const approvedTab = await TabsDB.approveTab(id);
     

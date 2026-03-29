@@ -10,20 +10,19 @@ interface RouteParams {
 
 // POST /api/tabs/[id]/reject - Reject a pending tab (admin only)
 export async function POST(request: NextRequest, { params }: RouteParams) {
-  // Check authentication
-  if (!isAuthenticated(request)) {
-    return unauthorizedResponse();
-  }
-
   try {
+    await initializeDatabase();
+
+    if (!await isAuthenticated(request)) {
+      return unauthorizedResponse();
+    }
+
     const { id } = await params;
     const body = await request.json().catch(() => ({}));
     const rejectionReason = typeof body?.reason === 'string' ? body.reason.trim() : '';
     if (!rejectionReason) {
       return NextResponse.json({ error: 'Rejection reason is required' }, { status: 400 });
     }
-
-    await initializeDatabase();
 
     const rejectedTab = await TabsDB.rejectTab(id, rejectionReason);
 

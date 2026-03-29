@@ -78,7 +78,7 @@ export async function GET(request: NextRequest) {
     await initializeDatabase();
     
     // If admin authenticated, show all tabs (including pending)
-    const includeAll = isAuthenticated(request);
+    const includeAll = await isAuthenticated(request);
     const tabs = await TabsDB.getAllTabs(includeAll, limit, offset);
     return NextResponse.json(tabs);
   } catch (error) {
@@ -122,7 +122,7 @@ export async function POST(request: NextRequest) {
     const finalYoutubeLink = normalizedYoutubeLink.length > 0 ? normalizedYoutubeLink : null;
     const finalThumbnailUrl = normalizedThumbnailUrl.length > 0 ? normalizedThumbnailUrl : null;
 
-    const isAdmin = isAuthenticated(request);
+    const isAdmin = await isAuthenticated(request);
     if (!isAdmin) {
       const captchaCheck = await verifyTurnstileToken(captchaToken, request);
       if (!captchaCheck.ok) {

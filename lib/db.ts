@@ -2,6 +2,9 @@ import { neon } from "@neondatabase/serverless";
 import { createHash } from "crypto";
 
 const sql = neon(process.env.DATABASE_URL!);
+const globalForDbInit = globalThis as typeof globalThis & {
+  __harptabsDbInitPromise?: Promise<void>;
+};
 
 export type TabStatus = 'draft' | 'pending' | 'approved' | 'rejected';
 
@@ -83,9 +86,11 @@ export function detectHarmonicaType(holeHistory: string): 'diatonic' | 'tremolo'
 
 // Initialize database tables
 export async function initializeDatabase() {
-  try {
-    // Create the tabs table if it doesn't exist
-    await sql`
+  if (!globalForDbInit.__harptabsDbInitPromise) {
+    globalForDbInit.__harptabsDbInitPromise = (async () => {
+      try {
+        // Create the tabs table if it doesn't exist
+        await sql`
       CREATE TABLE IF NOT EXISTS harmonica_tabs (
         id VARCHAR(255) PRIMARY KEY,
         title VARCHAR(500) NOT NULL,
@@ -103,55 +108,55 @@ export async function initializeDatabase() {
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
       )
     `;
-    
-    // Add status column if it doesn't exist (for existing tables)
-    await sql`
+
+        // Add status column if it doesn't exist (for existing tables)
+        await sql`
       ALTER TABLE harmonica_tabs 
       ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'approved'
     `;
-    
-    // Add harmonica_type column if it doesn't exist
-    await sql`
+
+        // Add harmonica_type column if it doesn't exist
+        await sql`
       ALTER TABLE harmonica_tabs 
       ADD COLUMN IF NOT EXISTS harmonica_type VARCHAR(20) DEFAULT 'diatonic'
     `;
 
-    await sql`
+        await sql`
       ALTER TABLE harmonica_tabs 
       ADD COLUMN IF NOT EXISTS difficulty VARCHAR(50) DEFAULT 'Beginner'
     `;
 
-    await sql`
+        await sql`
       ALTER TABLE harmonica_tabs 
       ADD COLUMN IF NOT EXISTS genre VARCHAR(100) DEFAULT ''
     `;
 
-    await sql`
+        await sql`
       ALTER TABLE harmonica_tabs 
       ADD COLUMN IF NOT EXISTS music_key VARCHAR(50) DEFAULT ''
     `;
 
-    await sql`
+        await sql`
       ALTER TABLE harmonica_tabs
       ADD COLUMN IF NOT EXISTS thumbnail_url TEXT
     `;
 
-    await sql`
+        await sql`
       ALTER TABLE harmonica_tabs
       ADD COLUMN IF NOT EXISTS youtube_link TEXT
     `;
 
-    await sql`
+        await sql`
       ALTER TABLE harmonica_tabs 
       ADD COLUMN IF NOT EXISTS rejection_reason TEXT
     `;
 
-    await sql`
+        await sql`
       ALTER TABLE harmonica_tabs 
       ADD COLUMN IF NOT EXISTS view_count INTEGER DEFAULT 0
     `;
 
-    await sql`
+        await sql`
       CREATE TABLE IF NOT EXISTS submission_rate_limits (
         id SERIAL PRIMARY KEY,
         ip_address VARCHAR(100) NOT NULL,
@@ -159,87 +164,119 @@ export async function initializeDatabase() {
       )
     `;
 
-    await sql`
+        await sql`
       CREATE INDEX IF NOT EXISTS submission_rate_limits_ip_created_at_idx
       ON submission_rate_limits (ip_address, created_at DESC)
     `;
 
-    await sql`
+        await sql`
       ALTER TABLE harmonica_tabs 
       ADD COLUMN IF NOT EXISTS content_hash VARCHAR(64)
     `;
 
-    await sql`
+        await sql`
       CREATE INDEX IF NOT EXISTS harmonica_tabs_content_hash_idx
       ON harmonica_tabs (content_hash)
     `;
 
-    await sql`      ALTER TABLE harmonica_tabs 
+        await sql`      ALTER TABLE harmonica_tabs 
       ADD COLUMN IF NOT EXISTS view_count INTEGER DEFAULT 0
     `;
 
-    await sql`      UPDATE harmonica_tabs
+        await sql`      UPDATE harmonica_tabs
       SET difficulty = 'Beginner'
       WHERE difficulty IS NULL OR difficulty = ''
     `;
-    
-    // Approve all existing tabs (one-time migration)
-    // This ensures tabs created before the review system are visible
-    await sql`
+
+        // Approve all existing tabs (one-time migration)
+        // This ensures tabs created before the review system are visible
+        await sql`
       UPDATE harmonica_tabs 
       SET status = 'approved' 
       WHERE status IS NULL OR status = ''
     `;
-    
-    // Migrate existing tabs to detect harmonica type (one-time migration)
-    // This reads all tabs and sets the correct harmonica_type based on hole_history
-    const existingTabs = await sql`
+
+        // Migrate existing tabs to detect harmonica type (one-time migration)
+        // This reads all tabs and sets the correct harmonica_type based on hole_history
+        const existingTabs = await sql`
       SELECT id, hole_history 
       FROM harmonica_tabs 
       WHERE harmonica_type IS NULL OR harmonica_type = ''
     `;
-    
-    for (const tab of existingTabs) {
-      const detectedType = detectHarmonicaType(tab.hole_history);
-      await sql`
+
+        for (const tab of existingTabs) {
+          const detectedType = detectHarmonicaType(tab.hole_history);
+          await sql`
         UPDATE harmonica_tabs 
         SET harmonica_type = ${detectedType}
         WHERE id = ${tab.id}
       `;
-    }
+        }
 
-    const tabsMissingHash = await sql`
+        const tabsMissingHash = await sql`
       SELECT id, title, hole_history, note_history, harmonica_type, difficulty, genre, music_key
       FROM harmonica_tabs
       WHERE content_hash IS NULL OR content_hash = ''
     `;
 
-    for (const tab of tabsMissingHash) {
-      const hash = buildTabContentHash({
-        title: tab.title,
-        holeHistory: tab.hole_history ?? "",
-        noteHistory: tab.note_history ?? "",
-        harmonicaType: tab.harmonica_type ?? "diatonic",
-        difficulty: tab.difficulty ?? "Beginner",
-        key: tab.music_key ?? "",
-        genre: tab.genre ?? ""
-      });
+        for (const tab of tabsMissingHash) {
+          const hash = buildTabContentHash({
+            title: tab.title,
+            holeHistory: tab.hole_history ?? "",
+            noteHistory: tab.note_history ?? "",
+            harmonicaType: tab.harmonica_type ?? "diatonic",
+            difficulty: tab.difficulty ?? "Beginner",
+            key: tab.music_key ?? "",
+            genre: tab.genre ?? ""
+          });
 
-      await sql`
+          await sql`
         UPDATE harmonica_tabs
         SET content_hash = ${hash}
         WHERE id = ${tab.id}
       `;
-    }
-    
-    if (existingTabs.length > 0) {
-      console.log(`Migrated ${existingTabs.length} existing tabs with detected harmonica types`);
-    }
-    
-    console.log('Database initialized successfully');
-  } catch (error) {
-    console.error('Error initializing database:', error);
-    throw error;
+        }
+
+        if (existingTabs.length > 0) {
+          console.log(`Migrated ${existingTabs.length} existing tabs with detected harmonica types`);
+        }
+
+        // Create settings table for app configuration (e.g. hashed admin password)
+        await sql`
+      CREATE TABLE IF NOT EXISTS app_settings (
+        key VARCHAR(100) PRIMARY KEY,
+        value TEXT NOT NULL,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      )
+    `;
+
+        console.log('Database initialized successfully');
+      } catch (error) {
+        globalForDbInit.__harptabsDbInitPromise = undefined;
+        console.error('Error initializing database:', error);
+        throw error;
+      }
+    })();
+  }
+
+  await globalForDbInit.__harptabsDbInitPromise;
+}
+
+// Settings DB
+export class SettingsDB {
+  static async get(key: string): Promise<string | null> {
+    const rows = await sql`
+      SELECT value FROM app_settings WHERE key = ${key}
+    `;
+    return rows.length > 0 ? (rows[0].value as string) : null;
+  }
+
+  static async set(key: string, value: string): Promise<void> {
+    await sql`
+      INSERT INTO app_settings (key, value, updated_at)
+      VALUES (${key}, ${value}, NOW())
+      ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()
+    `;
   }
 }
 
