@@ -13,18 +13,27 @@ import { useToast } from '@/hooks/use-toast';
 import { convertDiatonicToTremolo, convertTremoloToDiatonic, getHarmonicaLayout, type HarmonicaType, type HoleAction, isDiatonicLayout, isTremoloLayout, type Note } from '@/lib/harmonica';
 import type { SavedTab } from '../../../lib/db';
 import { ArrowRightLeft, Clipboard, CornerDownLeft, Delete, Redo2, Save, Trash2, Undo2 } from 'lucide-react';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import HarmonicaDiagram from './harmonica-diagram';
 import SaveTabDialog from '@/components/tabs/editor/save-tab-dialog';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 
+export interface HarpNavigatorDraft {
+  holeHistory?: string;
+  noteHistory?: string;
+  lyrics?: string;
+  harmonicaType?: HarmonicaType;
+}
+
 interface HarpNavigatorProps {
   tab?: SavedTab;
   mode?: 'create' | 'edit';
+  draft?: HarpNavigatorDraft;
+  draftVersion?: number;
 }
-export default function HarpNavigator({ tab, mode = "create" }: HarpNavigatorProps) {
+export default function HarpNavigator({ tab, mode = "create", draft, draftVersion }: HarpNavigatorProps) {
   const [harmonicaType, setHarmonicaType] = useState<HarmonicaType>(tab?.harmonicaType || 'tremolo');
   const [selectedNote, setSelectedNote] = useState<Note | null>(null);
   const [selectedHoleInfo, setSelectedHoleInfo] = useState<{ hole: number; action: HoleAction } | null>(null);
@@ -40,6 +49,7 @@ export default function HarpNavigator({ tab, mode = "create" }: HarpNavigatorPro
   const layout = useMemo(() => getHarmonicaLayout(harmonicaType), [harmonicaType]);
   const processingRef = useRef(false);
   const holeTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const lastAppliedDraftVersionRef = useRef<number | undefined>(undefined);
 
   const getCurrentState = useCallback(() => ({
     holeHistory,
@@ -60,6 +70,26 @@ export default function HarpNavigator({ tab, mode = "create" }: HarpNavigatorPro
     setRedoStack([]);
     applyState(nextState);
   }, [applyState, getCurrentState]);
+
+  useEffect(() => {
+    if (draftVersion === undefined || !draft) {
+      return;
+    }
+
+    if (lastAppliedDraftVersionRef.current === draftVersion) {
+      return;
+    }
+
+    lastAppliedDraftVersionRef.current = draftVersion;
+    setSelectedHoleInfo(null);
+    setSelectedNote(null);
+    applyEdit({
+      holeHistory: draft.holeHistory ?? '',
+      noteHistory: draft.noteHistory ?? '',
+      lyrics: draft.lyrics ?? '',
+      harmonicaType: draft.harmonicaType ?? harmonicaType,
+    });
+  }, [applyEdit, draft, draftVersion, harmonicaType]);
 
   const appendToken = (prev: string, token: string) => {
     if (!prev) return token;

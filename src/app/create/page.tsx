@@ -1,7 +1,7 @@
-import HarpNavigator from "@/components/harp-workbench/harp-navigator";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
+import CreateTabPageClient from "@/components/tabs/editor/create-tab-page-client";
 
 export default function CreateTabPage() {
   return (
@@ -15,7 +15,7 @@ export default function CreateTabPage() {
             </Button>
           </Link>
         </div>
-        <HarpNavigator />
+        <CreateTabPageClient />
       </div>
     </main>
   );
